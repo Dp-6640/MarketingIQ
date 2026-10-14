@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Throwaway credentials for the CI service container only.
+      DATABASE_URL: postgresql+psycopg://miq_owner:ci_owner@localhost:5432/marketingiq
+      DATABASE_URL_APP: postgresql+psycopg://miq_app:ci_app@localhost:5432/marketingiq
+      TEST_DATABASE_URL: postgresql+psycopg://miq_owner:ci_owner@localhost:5432/marketingiq_test
+      MIQ_REQUIRE_TEST_DB: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Create roles and databases
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE miq_owner LOGIN PASSWORD 'ci_owner';
+          CREATE ROLE miq_app LOGIN PASSWORD 'ci_app';
+          ALTER ROLE miq_owner SET timezone = 'UTC';
+          ALTER ROLE miq_app SET timezone = 'UTC';
+          CREATE DATABASE marketingiq OWNER miq_owner;
+          CREATE DATABASE marketingiq_test OWNER miq_owner;
+          REVOKE ALL ON DATABASE marketingiq FROM PUBLIC;
+          REVOKE ALL ON DATABASE marketingiq_test FROM PUBLIC;
+          GRANT CONNECT ON DATABASE marketingiq TO miq_app;
+          GRANT CONNECT ON DATABASE marketingiq_test TO miq_app;
+          SQL
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Migrate a fresh database
+        run: uv run alembic upgrade head

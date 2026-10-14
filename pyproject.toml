@@ -36,6 +36,10 @@ target-version = "py313"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# SQLAlchemy's __table_args__ is a class-level dict by design.
+"src/marketingiq/models.py" = ["RUF012"]
+
 [dependency-groups]
 dev = [
     "httpx2>=2.13.1",

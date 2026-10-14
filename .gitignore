@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local data, exports and secrets
+data/local/
+data/real/
+secrets/
+data/synthetic/
+*.csv
+# Small hand-built test fixtures are the only CSVs that may be committed
+!tests/fixtures/**/*.csv
+*.parquet
+*.sqlite3
+*.db
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

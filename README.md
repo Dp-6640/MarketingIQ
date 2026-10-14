@@ -23,13 +23,25 @@ MarketingIQ is a proposed **internal, read-only marketing intelligence assistant
 - `docs/phase-0-checklist.md` — Phase 0 exit criteria.
 - `docs/decisions/` — initial architecture decision records (ADRs).
 
-## Recommended next steps
+## Development setup
 
-1. Read `docs/scope.md` and check whether the intended users and business questions match the problem you want to solve.
-2. Review `docs/unverified-register.md`. Unknown company configuration is intentionally marked as unverified; we will not invent it.
-3. Once Phase 0 definitions are stable, create the Python backend, PostgreSQL setup, synthetic generator and loader.
+Requirements: [uv](https://docs.astral.sh/uv/) and PostgreSQL 18 (16+ should work).
 
-No dependencies need to be installed for this documentation-only pack. We are deliberately not putting an LLM or live company data into the project at this stage.
+1. Create two roles and two databases (as the `postgres` superuser):
+   - `miq_owner`: owns `marketingiq` and `marketingiq_test`; runs migrations and loaders.
+   - `miq_app`: login role with `CONNECT` only; migrations grant it read access. Set `timezone = 'UTC'` on both roles.
+2. Copy `.env.example` to `.env` and fill in the passwords.
+3. Install and test:
+
+   ```bash
+   uv sync
+   uv run pytest            # integration tests skip if TEST_DATABASE_URL is unreachable
+   uv run ruff check . && uv run ruff format --check .
+   ```
+
+4. Run the API: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127.0.0.1:8000/health`.
+
+Phase 0 definitions live in `docs/`. No LLM and no company data are part of the project at this stage.
 
 ## Data and security principles
 

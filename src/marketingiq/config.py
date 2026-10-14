@@ -1,0 +1,28 @@
+"""Application settings, read from environment variables or a local .env file."""
+
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    # Owner role: runs migrations and loaders.
+    database_url: str
+    # Least-privilege role used by analytics, REST endpoints and assistant tools.
+    database_url_app: str | None = None
+    # Separate database that integration tests may wipe and rebuild.
+    test_database_url: str | None = None
+    # Role that migrations grant read access to (must match the role in DATABASE_URL_APP).
+    app_db_role: str = "miq_app"
+
+    @property
+    def app_url(self) -> str:
+        """URL for read paths; falls back to the owner URL when no app role is configured."""
+        return self.database_url_app or self.database_url
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

@@ -189,7 +189,7 @@ Emergency repairs: phone ~70%, callback form ~15%, chat ~10%, other ~5%.
 
 | ID | Scenario | When | What MarketingIQ must show | Question |
 |---|---|---|---|---|
-| S01 | Lead-form promo: cheap but low quality | Oct–Dec each year | Cost per lead well below the median, cost per qualified lead above it | Q6 |
+| S01 | Lead-form promo: cheap but low quality | Oct–Dec each year | Cost per lead well below the median, qualification rate well below it (so each qualified lead costs far more than the cost per lead suggests) | Q6 |
 | S02 | Paid search traffic with no spend feed | Always | Strong lead quality, but cost metrics are null with `no_spend_source` | Q7 |
 | S03 | Cold snaps | 2025-01-20→26, 2026-02-09→14 | Repair and phone demand up about 3×, acquisition barely moves, attribution coverage drops | Q21 |
 | S04 | Creative fatigue on `meta_prospecting_heatpump` | March 2026 | Spend +25%, CTR −35%, qualified leads about −30%; change explanation names this campaign | Q17, Q18 |

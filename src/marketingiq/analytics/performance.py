@@ -14,6 +14,7 @@ whatever the grouping.
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
+from statistics import median
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -85,6 +86,10 @@ class PerformanceQuery(BaseModel):
     sort_by: MetricName | None = None
     sort_desc: bool = True
     limit: int = Field(25, ge=1, le=100)
+    # Deterministic row selections the tool makes, so an LLM never compares numbers itself.
+    flags: list[Literal["cheap_leads_low_qualification"]] = Field(
+        default_factory=list, max_length=1
+    )
 
     @model_validator(mode="after")
     def _consistent(self) -> "PerformanceQuery":
@@ -94,7 +99,26 @@ class PerformanceQuery(BaseModel):
             raise ValueError("group_by repeats a dimension")
         if self.sort_by is not None and self.sort_by not in self.metrics:
             raise ValueError("sort_by must be one of the requested metrics")
+        if self.flags and self.group_by != ["campaign"]:
+            raise ValueError("flags compare campaigns: group_by must be ['campaign']")
+        if self.flags and "cost_per_lead" not in self.metrics:
+            raise ValueError("cheap_leads_low_qualification needs cost_per_lead in metrics")
         return self
+
+
+# Question 6, "low cost per lead but high cost per qualified lead". Cost per qualified lead
+# is cost per lead / qualification rate, and costs per lead and per qualified lead rise and
+# fall together across campaigns, so the question is answered by the rate that separates
+# them: cheap leads, of which few qualify (docs/question-tool-map.md).
+FLAG_RULES = {
+    "cheap_leads_low_qualification": {
+        "rule": "Among campaigns with spend and at least 10 credited leads: cost per lead "
+        "below the median and qualification rate below the median, so each qualified lead "
+        "costs more than the low cost per lead suggests.",
+        "min_paid_leads": Decimal(10),
+        "min_rows": 3,
+    }
+}
 
 
 @dataclass(frozen=True)
@@ -500,6 +524,9 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         return result
 
     rows = []
+    flag_results = {
+        name: _flag(name, keys, base_values=base_rows, hidden=hidden) for name in query.flags
+    }
     for key, base_values, hidden_bases in zip(keys, base_rows, hidden, strict=True):
         prior_values = (
             prior.rows.get(key, dict.fromkeys(prior.totals, Decimal(0))) if prior else None
@@ -513,6 +540,9 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
                 "values": values_for(base_values, prior_values, hidden_bases),
             }
         )
+        if query.flags:
+            rows[-1]["flags"] = [name for name in query.flags if key in flag_results[name]["keys"]]
+    _rank(rows, query.metrics)
     if query.sort_by:
         rows.sort(key=lambda r: (r["values"][query.sort_by].get("value") is None, r["key"]))
         present = [r for r in rows if r["values"][query.sort_by].get("value") is not None]
@@ -547,8 +577,57 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         "rows": rows[: query.limit],
         "row_count": len(rows),
         "totals": values_for(current.totals, prior.totals if prior else None, total_hidden),
+        **(
+            {"flag_rules": {n: f["summary"] for n, f in flag_results.items()}}
+            if query.flags
+            else {}
+        ),
         "warnings": unique_warnings(warnings),
     }
+
+
+def _rank(rows: list[dict], metrics: list[str]) -> None:
+    """Per metric, rank 1 = the largest shown value; ties share a rank; no rank without a
+    value (hidden, or null with a reason). Ranks cover every row, before `limit`."""
+    for name in metrics:
+        shown = [
+            r["values"][name]["value"] for r in rows if r["values"][name].get("value") is not None
+        ]
+        ordered = sorted(shown, reverse=True)
+        for row in rows:
+            cell = row["values"][name]
+            if cell.get("value") is not None:
+                cell["rank"] = ordered.index(cell["value"]) + 1
+                cell["rank_of"] = len(shown)
+
+
+def _flag(name: str, keys: list[tuple], base_values: list[dict], hidden: list[set]) -> dict:
+    """Which rows a flag selects, from unrounded base values. A row whose counts are hidden
+    by suppression is not judged, so a flag can't reveal a hidden value."""
+    rule = FLAG_RULES[name]
+    judged = {}
+    for key, values, hidden_bases in zip(keys, base_values, hidden, strict=True):
+        spend = values.get("spend") or Decimal(0)
+        leads = values.get("paid_leads") or Decimal(0)
+        qualified = values.get("paid_qualified_leads") or Decimal(0)
+        if hidden_bases & {"paid_leads", "paid_qualified_leads"}:
+            continue
+        if leads >= rule["min_paid_leads"] and spend > 0:
+            judged[key] = (spend / leads, qualified / leads)
+    summary: dict[str, Any] = {"rule": rule["rule"], "rows_judged": len(judged)}
+    if len(judged) < rule["min_rows"]:
+        summary["flagged"] = 0
+        summary["note"] = f"Fewer than {rule['min_rows']} campaigns qualify; nothing flagged."
+        return {"keys": set(), "summary": summary}
+    cpl_median = median(cpl for cpl, _ in judged.values())
+    rate_median = median(rate for _, rate in judged.values())
+    selected = {k for k, (cpl, rate) in judged.items() if cpl < cpl_median and rate < rate_median}
+    summary |= {
+        "median_cost_per_lead": round_value(cpl_median, "currency"),
+        "median_qualification_rate": round_value(rate_median, "rate"),
+        "flagged": len(selected),
+    }
+    return {"keys": selected, "summary": summary}
 
 
 def label(ctx: OrgContext, dimension: str, value: Any) -> str:

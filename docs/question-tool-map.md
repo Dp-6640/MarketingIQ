@@ -31,7 +31,7 @@ Unless a row says otherwise, the defaults apply: population `acquisition`, model
 | 3 | Qualified leads by service line and region vs last year | `get_performance` group_by=`service_line`,`region`; compare_to=`same_period_last_year` | qualified leads | `small_cell_suppressed`, `mapping_unverified` |
 | 4 | Cost per qualified lead by Meta campaign | `get_performance` group_by=`campaign`, filter platform=`meta` | spend, attributed qualified leads, cost per qualified lead | `low_attribution_coverage`, `mapping_unverified` |
 | 5 | Cost per completed consultation by campaign | `get_performance` group_by=`campaign` | cost per completed consultation | `no_spend_source` (non-Meta), `mapping_unverified` (appointments) |
-| 6 | Low cost per lead but high cost per qualified lead | `get_performance` group_by=`campaign`, metrics CPL + CPQL, ranks on | cost per lead, cost per qualified lead | Selection rule is deterministic: CPL below the median **and** CPQL above the median, with at least 10 attributed leads per campaign. The tool computes the flag; the LLM does not decide it. |
+| 6 | Low cost per lead but high cost per qualified lead | `get_performance` group_by=`campaign`, metrics CPL + CPQL + qualification rate, flags=[`cheap_leads_low_qualification`] | cost per lead, cost per qualified lead, qualification rate | Selection rule is deterministic: CPL below the median **and** qualification rate below the median, among campaigns with spend and at least 10 credited leads (at least 3 such campaigns). The tool computes the flag; the LLM does not decide it. Revised 2026-10-15, see below. |
 | 7 | Where cost metrics can't be calculated | `get_data_quality` section=`spend_coverage` | spend coverage by channel | `no_spend_source` |
 | 8 | Campaign cohorts that progressed to consultations or sales | `get_lead_funnel` group_by=`campaign` (attributed) | attributed funnel counts and rates | `immature_cohort`, `low_attribution_coverage` |
 | 9 | Funnel for furnace vs heat pump vs water-related | `get_lead_funnel` group_by=`service_line`, filter service_line ∈ {furnace, heat_pump, water_heater, water_treatment} | funnel rates | `mapping_unverified`, `classification_default_applied` |
@@ -59,6 +59,12 @@ Unless a row says otherwise, the defaults apply: population `acquisition`, model
 - `custom` comparison period (Q19, Q21).
 - `annotations` entity and `list_annotations` tool (Q19, Q21, Q25). Without them the assistant would have to guess when a change or event happened.
 - Deterministic selection rules for Q6 and Q18, so the LLM never decides which rows qualify.
+
+## Revision: question 6's rule (2026-10-15)
+
+The Phase 0 rule was "CPL below the median **and** CPQL above the median". Run on the synthetic data, it never selected anything, including the planted lead-form promos (S01). Costs per lead and per qualified lead rise and fall together across campaigns, because CPQL = CPL / qualification rate: the prospecting campaigns are the most expensive on both, so a cheap-per-lead campaign is almost never above the median CPQL.
+
+What the question means is "leads that look cheap but rarely qualify". The rule now compares the qualification rate: CPL below the median **and** qualification rate below the median. It selects the furnace promo every October–December and the AC promo in spring, and nothing else. Like every rule here, it's a convention to confirm with the performance marketing manager.
 
 ## Benchmark seeds
 

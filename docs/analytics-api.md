@@ -39,6 +39,17 @@ Every request takes an optional `?org=<slug>`. Without it, the API uses `DEFAULT
 - Values, with a `null_reason` instead of a misleading 0, and `suppressed: true` for cells
   under the small-cell threshold (k = 5).
 - `warnings`: caveat codes with plain-English messages (see `docs/metrics.md`).
+- In performance rows, every shown value has a `rank` (1 = largest, ties share a rank) and `rank_of` (how many rows have a value). Ranks cover all rows, before `limit`, so "third of eight" can be stated without counting.
+
+## Flags: selections the tool makes
+
+Some questions ask which rows meet a condition ("campaigns with cheap leads that rarely qualify"). The selection is a deterministic rule in the tool, never a comparison the LLM makes. A performance query takes `flags`; each flagged row lists it, and `flag_rules` states the rule, how many rows were judged, the medians used and how many were flagged.
+
+| Flag | Rule | Needs |
+|---|---|---|
+| `cheap_leads_low_qualification` | Cost per lead below the median and qualification rate below the median, among campaigns with spend and at least 10 credited leads; at least 3 such campaigns, or nothing is flagged | `group_by=["campaign"]`, `cost_per_lead` among the metrics |
+
+A row whose counts are hidden by small-cell suppression is not judged, so a flag can't reveal a hidden value.
 
 ## The four reports, briefly
 

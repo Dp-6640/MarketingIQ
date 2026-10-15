@@ -17,6 +17,7 @@ MarketingIQ is a proposed **internal, read-only marketing intelligence assistant
 - `docs/metrics.md` — metric definitions and reporting rules.
 - `docs/lifecycle_and_classification.md` — lead lifecycle and deterministic lead classification.
 - `docs/attribution.md` — attribution evidence tiers and model rules.
+- `docs/synthetic-data.md` — generator assumptions, planted scenarios and output files (all values synthetic).
 - `docs/question-tool-map.md` — each canonical question mapped to tools, metrics and expected caveats; seed for the benchmark.
 - `docs/source-to-canonical.md` — proposed source mappings and data flow.
 - `docs/unverified-register.md` — unknowns, provisional defaults and how to verify them.

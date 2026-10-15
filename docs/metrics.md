@@ -15,6 +15,11 @@ These definitions are the proposed contract for the MVP. They must be implemente
 
 ## Metric definitions
 
+Implemented once, in [`src/marketingiq/analytics/metrics.py`](../src/marketingiq/analytics/metrics.py), and computed by [`performance.py`](../src/marketingiq/analytics/performance.py). Two implementation rules matter when reading results:
+
+- **Lead counts are credit-weighted.** Every first lead's attribution credits sum to exactly 1, so grouping by campaign and grouping by service line come out of the same numbers, and rows always add up to the total.
+- **Cost metrics divide spend by leads credited to campaigns that have a spend feed.** Organic, email and paid-search leads never dilute a Meta cost per lead; groups with no spend feed show no cost and say why.
+
 | Metric | Definition | Null / caveat rules |
 |---|---|---|
 | `impressions` | Sum of source-reported impressions for the selected platform/campaign/date range. | 0 if no source rows exist only when source completeness is known; otherwise report incomplete coverage. |
@@ -78,4 +83,18 @@ Every analytical result should include `resolved` context (period, comparison pe
 
 ## Caveat codes expected by the MVP
 
-`population_default`, `low_attribution_coverage`, `no_spend_source`, `amount_basis_unverified`, `mapping_unverified`, `seasonal_comparison`, `immature_cohort`, `maturity_unknown`, `small_cell_suppressed`, `timezone_mismatch`, `synthetic_data`, `source_incomplete`, `classification_default_applied`, `unequal_periods`.
+`population_default`, `low_attribution_coverage`, `no_spend_source`, `amount_basis_unverified`, `mapping_unverified`, `seasonal_comparison`, `immature_cohort`, `maturity_unknown`, `small_cell_suppressed`, `timezone_mismatch`, `synthetic_data`, `source_incomplete`, `classification_default_applied`, `unequal_periods`, `spend_not_by_dimension`, `amount_basis_mixed`.
+
+## Why a value is missing
+
+A value that can't be computed honestly is `null` with a `null_reason`, never 0:
+
+| `null_reason` | Meaning |
+|---|---|
+| `not_available_for_dimension` | The data can't be split this way (spend by service line) |
+| `not_available_for_filter` | The data can't be filtered this way (sessions by region) |
+| `no_spend_source` | The group has no spend feed (organic, email, paid search here) |
+| `zero_denominator` | The ratio's denominator is 0 (no leads, no clicks) |
+| `amount_basis_required` | Amounts need one amount basis chosen |
+
+A value hidden by small-cell suppression is `{"value": null, "suppressed": true}`; a stated `null_reason` takes precedence over suppression.

@@ -192,8 +192,8 @@ Emergency repairs: phone ~70%, callback form ~15%, chat ~10%, other ~5%.
 | S01 | Lead-form promo: cheap but low quality | Oct–Dec each year | Cost per lead well below the median, qualification rate well below it (so each qualified lead costs far more than the cost per lead suggests) | Q6 |
 | S02 | Paid search traffic with no spend feed | Always | Strong lead quality, but cost metrics are null with `no_spend_source` | Q7 |
 | S03 | Cold snaps | 2025-01-20→26, 2026-02-09→14 | Repair and phone demand up about 3×, acquisition barely moves, attribution coverage drops | Q21 |
-| S04 | Creative fatigue on `meta_prospecting_heatpump` | March 2026 | Spend +25%, CTR −35%, qualified leads about −30%; change explanation names this campaign | Q17, Q18 |
-| S05 | Location-page change | 2026-05-12 | Form submit rate about +20% afterwards; recorded as an annotation; phrased as "coincided" | Q19 |
+| S04 | Creative fatigue on `meta_prospecting_heatpump` | March 2026 | Spend +25%, CTR −35%, qualified leads about −30%; change explanation names this campaign. The campaign gets almost no lead credit in any month, so the quality drop is invisible in attributed numbers; only the spend rise shows (`docs/benchmark.md`) | Q17, Q18 |
+| S05 | Location-page change | 2026-05-12 | Form submit rate about +20% afterwards; recorded as an annotation; phrased as "coincided". At about 420 location-page sessions a month the effect is within noise, so the right answer is "no detectable change" (`docs/benchmark.md`) | Q19 |
 | S06 | Hidden-field capture breaks | 2026-07-07→16 | Captures drop to 0; data quality must detect it **without** an annotation, and it must not read as a performance drop | Q22, Q23 |
 | S07 | Meta reports more leads than the CRM | Always | Shown side by side, never added together | Q14 |
 | S08 | Retargeting selection bias | Always | Retargeting gets large last-touch credit; the truth files show zero true effect (V1 demonstration) | Q13 |

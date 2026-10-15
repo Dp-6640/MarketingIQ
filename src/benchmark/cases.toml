@@ -1,0 +1,441 @@
+# MarketingIQ benchmark cases (docs/benchmark.md).
+#
+# One case per canonical question in docs/question-tool-map.md, plus refusal, clarification
+# and abstention cases. Values refer to the default synthetic dataset (seed 20261014,
+# data_as_of 2026-09-30: "last month" is September 2026, "last quarter" July-September).
+#
+# kind:      answer | clarify (ask which one) | abstain (say the data can't give a number)
+#            | refuse (out of scope by design)
+# calls:     the reference tool calls, in order; the assistant may reach the same results
+#            another way, but these are what the answer key is built from
+# warnings:  caveat codes the answer must carry; each must appear in the calls' results
+# facts:     "<call>:<path>" into a call's result: numbers and values the answer must cite
+# expect:    what the results must show for the planted scenario, checked by the reference run
+# forbidden: phrases the answer must not use (scored in Phase 4)
+
+[[case]]
+id = "Q01"
+covers = "question-tool-map #1"
+question = "Which campaigns brought in the most qualified new-customer leads last month?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_month" }, group_by = ["campaign"], metrics = ["qualified_leads", "leads"], sort_by = "qualified_leads" } },
+]
+warnings = ["mapping_unverified", "low_attribution_coverage"]
+facts = ["0:resolved.period", "0:resolved.attribution_model", "0:rows[0].key", "0:rows[0].values.qualified_leads.value", "0:totals.qualified_leads.value"]
+expect = [
+  { path = "0:resolved.period.start", op = "equals", value = "2026-09-01" },
+  { path = "0:resolved.period.end", op = "equals", value = "2026-09-30" },
+]
+
+[[case]]
+id = "Q02"
+covers = "question-tool-map #2"
+scenario = "S14"
+question = "Do leads from the website chat and Facebook Messenger qualify as often as leads from our web forms and phone?"
+kind = "answer"
+calls = [
+  { tool = "get_lead_funnel", args = { period = { preset = "custom", start = "2025-10-01", end = "2026-09-30" }, group_by = ["entry_point"] } },
+]
+warnings = ["mapping_unverified", "classification_default_applied"]
+facts = ["0:rows{key=web_chat_agent}.values.qualification_rate.value", "0:rows{key=meta_messaging_agent}.values.qualification_rate.value", "0:rows{key=web_quote_form}.values.qualification_rate.value", "0:rows{key=phone}.values.qualification_rate.value"]
+expect = [
+  { path = "0:rows{key=web_chat_agent}.values.qualification_rate.value", op = "lt", value = "@0:rows{key=web_quote_form}.values.qualification_rate.value" },
+]
+
+[[case]]
+id = "Q03"
+covers = "question-tool-map #3"
+question = "How many qualified leads did each service line bring in, by region, last quarter compared with the same quarter last year?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_quarter" }, compare_to = "same_period_last_year", group_by = ["service_line", "region"], metrics = ["qualified_leads"], limit = 100 } },
+]
+warnings = ["mapping_unverified", "small_cell_suppressed"]
+facts = ["0:resolved.comparison", "0:totals.qualified_leads.value", "0:totals.qualified_leads.previous"]
+expect = [
+  { path = "0:resolved.comparison.start", op = "equals", value = "2025-07-01" },
+]
+
+[[case]]
+id = "Q04"
+covers = "question-tool-map #4"
+question = "What did a qualified lead cost us on each Meta campaign last quarter?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_quarter" }, group_by = ["campaign"], filters = { platforms = ["meta"] }, metrics = ["spend", "qualified_leads", "cost_per_qualified_lead"], sort_by = "cost_per_qualified_lead" } },
+]
+warnings = ["mapping_unverified"]
+facts = ["0:rows[0].key", "0:rows[0].values.cost_per_qualified_lead.value", "0:totals.cost_per_qualified_lead.value"]
+
+[[case]]
+id = "Q04b"
+covers = "question-tool-map #4"
+scenario = "S11"
+question = "Over last heating season (September to February), was the Ottawa furnace campaign more expensive per qualified lead than the Ontario-wide furnace campaign?"
+kind = "answer"
+calls = [
+  { tool = "list_dimension_values", args = { dimension = "campaign", search = "prospecting furnace" } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2025-09-01", end = "2026-02-28" }, group_by = ["campaign"], filters = { campaigns = ["meta_prospecting_furnace", "meta_prospecting_furnace_ottawa"] }, metrics = ["spend", "qualified_leads", "cost_per_qualified_lead"], attribution_model = "linear" } },
+]
+warnings = ["mapping_unverified"]
+facts = ["1:rows{key=meta_prospecting_furnace_ottawa}.values.cost_per_qualified_lead.value", "1:rows{key=meta_prospecting_furnace}.values.cost_per_qualified_lead.value", "1:resolved.attribution_model"]
+expect = [
+  { path = "0:match", op = "equals", value = "several" },
+  { path = "1:rows{key=meta_prospecting_furnace_ottawa}.values.cost_per_qualified_lead.value", op = "gt", value = "@1:rows{key=meta_prospecting_furnace}.values.cost_per_qualified_lead.value" },
+]
+
+[[case]]
+id = "Q05"
+covers = "question-tool-map #5"
+question = "What did each campaign pay per completed in-home consultation last quarter?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_quarter" }, group_by = ["campaign"], metrics = ["spend", "consultations_completed", "cost_per_completed_consultation"] } },
+]
+warnings = ["mapping_unverified", "no_spend_source"]
+facts = ["0:totals.cost_per_completed_consultation.value"]
+expect = [
+  { path = "0:rows{key=search_generic}.values.cost_per_completed_consultation.null_reason", op = "equals", value = "no_spend_source" },
+]
+
+[[case]]
+id = "Q06"
+covers = "question-tool-map #6"
+scenario = "S01"
+question = "Last October to December, which campaigns had a low cost per lead but a high cost per qualified lead?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2025-10-01", end = "2025-12-31" }, group_by = ["campaign"], metrics = ["cost_per_lead", "cost_per_qualified_lead", "qualification_rate"], flags = ["cheap_leads_low_qualification"] } },
+]
+warnings = ["mapping_unverified"]
+facts = ["0:flag_rules.cheap_leads_low_qualification", "0:rows{key=meta_lead_form_furnace_promo}.values.cost_per_lead.value", "0:rows{key=meta_lead_form_furnace_promo}.values.cost_per_qualified_lead.value"]
+expect = [
+  { path = "0:flag_rules.cheap_leads_low_qualification.flagged", op = "equals", value = 1 },
+  { path = "0:rows{key=meta_lead_form_furnace_promo}.flags", op = "contains", value = "cheap_leads_low_qualification" },
+]
+
+[[case]]
+id = "Q07"
+covers = "question-tool-map #7"
+scenario = "S02"
+question = "Where can't we calculate cost per lead, and why?"
+kind = "answer"
+calls = [
+  { tool = "get_data_quality", args = { period = { preset = "last_quarter" } } },
+]
+facts = ["0:acquisition_without_spend_feed_by_channel.paid_search.value", "0:acquisition_without_spend_feed_by_channel"]
+expect = [
+  { path = "0:acquisition_without_spend_feed_by_channel.paid_search.value", op = "gt", value = 0 },
+]
+
+[[case]]
+id = "Q08"
+covers = "question-tool-map #8"
+question = "For leads that came in from October to March, which campaigns' leads went on to consultations and sales?"
+kind = "answer"
+calls = [
+  { tool = "get_lead_funnel", args = { period = { preset = "custom", start = "2025-10-01", end = "2026-03-31" }, group_by = ["campaign"] } },
+]
+warnings = ["mapping_unverified", "low_attribution_coverage"]
+facts = ["0:totals.consultations_completed.value", "0:totals.sales_won.value"]
+
+[[case]]
+id = "Q09"
+covers = "question-tool-map #9"
+question = "Compare the funnel for furnace, heat pump and water products over the past year."
+kind = "answer"
+calls = [
+  { tool = "get_lead_funnel", args = { period = { preset = "custom", start = "2025-10-01", end = "2026-09-30" }, group_by = ["service_line"], filters = { service_lines = ["furnace", "heat_pump", "water_heater", "water_treatment"] } } },
+]
+warnings = ["mapping_unverified", "immature_cohort"]
+facts = ["0:rows{key=furnace}.values.qualification_rate.value", "0:rows{key=heat_pump}.values.qualification_rate.value", "0:rows{key=water_heater}.values.qualification_rate.value"]
+
+[[case]]
+id = "Q10"
+covers = "question-tool-map #10"
+scenario = "S12"
+question = "Which recent months of leads are too new to judge on sales?"
+kind = "answer"
+calls = [
+  { tool = "get_lead_funnel", args = { period = { preset = "custom", start = "2026-04-01", end = "2026-09-30" }, group_by = ["lead_month"] } },
+  { tool = "get_data_quality", args = { period = { preset = "custom", start = "2026-04-01", end = "2026-09-30" } } },
+]
+warnings = ["immature_cohort"]
+facts = ["1:cohort_maturity_days", "0:rows[-1].values.lead_to_sale_rate"]
+
+[[case]]
+id = "Q11"
+covers = "question-tool-map #11"
+question = "How would last quarter's campaign credit change under first-touch, last-touch and linear attribution?"
+kind = "answer"
+calls = [
+  { tool = "compare_attribution_models", args = { period = { preset = "last_quarter" }, group_by = "campaign" } },
+]
+warnings = ["mapping_unverified", "low_attribution_coverage"]
+facts = ["0:evidence.journey_share", "0:rows[0].credit"]
+
+[[case]]
+id = "Q12"
+covers = "question-tool-map #12"
+question = "What share of new-customer leads can we actually tie to a campaign, and on what evidence?"
+kind = "answer"
+calls = [
+  { tool = "compare_attribution_models", args = { period = { preset = "last_quarter" }, group_by = "channel" } },
+]
+warnings = ["low_attribution_coverage"]
+facts = ["0:evidence.campaign_coverage", "0:evidence.journey_share", "0:evidence.by_tier"]
+expect = [
+  { path = "0:evidence.campaign_coverage", op = "lt", value = 0.6 },
+]
+
+[[case]]
+id = "Q13"
+covers = "question-tool-map #13"
+scenario = "S08"
+question = "How much credit does retargeting get under each attribution model over the past year?"
+kind = "answer"
+calls = [
+  { tool = "compare_attribution_models", args = { period = { preset = "custom", start = "2025-10-01", end = "2026-09-30" }, group_by = "campaign_tactic" } },
+]
+warnings = ["mapping_unverified", "low_attribution_coverage"]
+facts = ["0:rows{key=retargeting}.credit", "0:rows{key=prospecting}.credit", "0:evidence.journey_share"]
+expect = [
+  { path = "0:rows{key=retargeting}.credit.last_non_direct", op = "gt", value = "@0:rows{key=retargeting}.credit.first_touch" },
+  { path = "0:rows{key=prospecting}.credit.first_touch", op = "gt", value = "@0:rows{key=prospecting}.credit.last_non_direct" },
+]
+forbidden = ["retargeting caused", "retargeting drove"]
+notes = "Credit is not effect: the truth files show retargeting has no real effect (S08). The answer must not call the credit an effect."
+
+[[case]]
+id = "Q14"
+covers = "question-tool-map #14"
+scenario = "S07"
+question = "How do Meta's reported leads compare with the leads in Salesforce, campaign by campaign, last month?"
+kind = "answer"
+calls = [
+  { tool = "get_source_reconciliation", args = { period = { preset = "last_month" } } },
+]
+warnings = ["sources_not_additive"]
+facts = ["0:rows{key=meta_prospecting_furnace}.values.meta_reported_leads.value", "0:rows{key=meta_prospecting_furnace}.values.crm_leads_linked.value"]
+forbidden = ["in total, meta and salesforce", "combined total"]
+
+[[case]]
+id = "Q15"
+covers = "question-tool-map #15"
+question = "Do GA4's form submissions match the leads we see in the CRM?"
+kind = "answer"
+calls = [
+  { tool = "get_source_reconciliation", args = { period = { preset = "last_quarter" } } },
+  { tool = "get_data_quality", args = { period = { preset = "last_quarter" } } },
+]
+warnings = ["sources_not_additive"]
+facts = ["0:rows[0].values.ga4_form_submit_sessions"]
+
+[[case]]
+id = "Q16"
+covers = "question-tool-map #16"
+scenario = "S09"
+question = "Are there campaigns or UTMs we couldn't match to our campaign list?"
+kind = "answer"
+calls = [
+  { tool = "get_data_quality", args = { period = { preset = "last_quarter" } } },
+]
+facts = ["0:campaign_mapping.unmapped_campaign_values", "0:campaign_mapping.spend_not_in_mapping_sheet"]
+expect = [
+  { path = "0:campaign_mapping.unmapped_campaign_values.meta_prospecting_summer_test.sessions", op = "gt", value = 0 },
+]
+
+[[case]]
+id = "Q17"
+covers = "question-tool-map #17"
+scenario = "S04"
+question = "Cost per qualified lead went up in March 2026. What contributed?"
+kind = "answer"
+calls = [
+  { tool = "explain_metric_change", args = { metric = "cost_per_qualified_lead", dimension = "campaign", period = { preset = "custom", start = "2026-03-01", end = "2026-03-31" } } },
+]
+warnings = ["seasonal_comparison", "small_cell_suppressed"]
+facts = ["0:total", "0:segments[0].key", "0:segments[0].effect", "0:segments[0].numerator"]
+expect = [
+  { path = "0:segments[0].key", op = "equals", value = "meta_prospecting_heatpump" },
+  { path = "0:segments[0].direction", op = "startswith", value = "spend_up" },
+]
+forbidden = ["caused"]
+
+[[case]]
+id = "Q18"
+covers = "question-tool-map #18"
+scenario = "S04"
+question = "Which campaigns spent more in March 2026 than in February while bringing in fewer qualified leads?"
+kind = "answer"
+calls = [
+  { tool = "explain_metric_change", args = { metric = "cost_per_qualified_lead", dimension = "campaign", period = { preset = "custom", start = "2026-03-01", end = "2026-03-31" } } },
+]
+warnings = ["small_cell_suppressed"]
+facts = ["0:segments{key=meta_prospecting_heatpump}.direction", "0:segments{key=meta_prospecting_heatpump}.numerator"]
+expect = [
+  { path = "0:segments{key=meta_prospecting_heatpump}.direction", op = "equals", value = "spend_up_paid_qualified_leads_flat" },
+]
+notes = "The honest answer: no visible campaign matches. Heat-pump spend rose about 37% but the campaign is credited with no qualified leads in either month, and the rest are hidden as small counts. S04's planted quality drop is invisible in attributed data (docs/benchmark.md)."
+
+[[case]]
+id = "Q19"
+covers = "question-tool-map #19"
+scenario = "S05"
+question = "Did the location-page redesign change how often visitors submit a form?"
+kind = "answer"
+calls = [
+  { tool = "list_annotations", args = { annotation_type = "site_change" } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2026-05-12", end = "2026-06-10" }, compare_to = "custom", comparison = { preset = "custom", start = "2026-04-12", end = "2026-05-11" }, group_by = ["landing_page_type"], metrics = ["sessions", "form_submit_rate"] } },
+]
+warnings = ["change_within_noise"]
+facts = ["0:annotations[0]", "1:rows{key=location}.values.sessions.value", "1:rows{key=location}.values.form_submit_rate"]
+expect = [
+  { path = "0:annotations[0].start_date", op = "equals", value = "2026-05-12" },
+  { path = "1:rows{key=location}.values.form_submit_rate.change_significant", op = "equals", value = false },
+]
+forbidden = ["caused", "because of the redesign", "thanks to the redesign", "the redesign worked", "the redesign hurt"]
+notes = "The honest answer: no detectable change. Location pages get about 420 sessions and 19 form submissions a month, so chance alone moves the rate by about 23%; the planted +20% (S05) can't be told apart from noise. The answer should say what volume or test would settle it."
+
+[[case]]
+id = "Q20"
+covers = "question-tool-map #20"
+scenario = "S10"
+question = "Last quarter, how many enquiries were from existing customers or for service, compared with new-customer leads?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_quarter" }, population = "all", group_by = ["lead_class"], metrics = ["leads"] } },
+]
+warnings = ["classification_default_applied"]
+facts = ["0:rows{key=acquisition}.values.leads.value", "0:rows{key=service_demand}.values.leads.value", "0:rows{key=existing_customer_sales}.values.leads.value", "0:rows{key=unknown}.values.leads.value"]
+
+[[case]]
+id = "Q21"
+covers = "question-tool-map #21"
+scenario = "S03"
+question = "During the February 2026 cold snap, did service calls rise more than new-customer leads?"
+kind = "answer"
+calls = [
+  { tool = "list_annotations", args = { annotation_type = "cold_snap", start = "2026-02-01", end = "2026-02-28" } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2026-02-09", end = "2026-02-14" }, compare_to = "previous_period", population = "all", group_by = ["lead_class"], metrics = ["leads"] } },
+]
+facts = ["1:rows{key=service_demand}.values.leads", "1:rows{key=acquisition}.values.leads"]
+expect = [
+  { path = "1:rows{key=service_demand}.values.leads.change_pct", op = "gt", value = 1.0 },
+  { path = "1:rows{key=service_demand}.values.leads.change_pct", op = "gt", value = "@1:rows{key=acquisition}.values.leads.change_pct" },
+]
+
+[[case]]
+id = "Q22"
+covers = "question-tool-map #22"
+scenario = "S06"
+question = "What can't we conclude about July 2026?"
+kind = "answer"
+calls = [
+  { tool = "get_data_quality", args = { period = { preset = "custom", start = "2026-07-01", end = "2026-07-31" } } },
+]
+warnings = ["capture_drop"]
+facts = ["0:capture_by_week", "0:usual_weekly_capture_share", "0:evidence.acquisition_coverage"]
+expect = [
+  { path = "0:capture_by_week{dropped=true}.week_of", op = "equals", value = "2026-07-06" },
+]
+forbidden = ["fewer customers", "performance dropped"]
+
+[[case]]
+id = "Q23"
+covers = "question-tool-map #23"
+question = "Is any of our source data incomplete for last quarter?"
+kind = "answer"
+calls = [
+  { tool = "get_data_quality", args = { period = { preset = "last_quarter" } } },
+]
+facts = ["0:days_without_data", "0:latest_loads", "0:failed_loads"]
+expect = [
+  { path = "0:failed_loads", op = "equals", value = 0 },
+]
+
+# --- refusal, clarification and abstention -------------------------------------------------
+
+[[case]]
+id = "R01"
+covers = "benchmark seed: real-business question"
+question = "What is our real average sales cycle?"
+kind = "refuse"
+notes = "The data is synthetic: it describes a fictional business, not LG Home Comfort."
+
+[[case]]
+id = "R02"
+covers = "benchmark seed: no spend source"
+scenario = "S02"
+question = "What was our Google Ads cost per lead last month?"
+kind = "abstain"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_month" }, group_by = ["platform"], metrics = ["leads", "cost_per_lead"] } },
+]
+warnings = ["no_spend_source"]
+facts = ["0:rows{key=google_ads}.values.leads.value"]
+expect = [
+  { path = "0:rows{key=google_ads}.values.cost_per_lead.null_reason", op = "equals", value = "no_spend_source" },
+]
+notes = "No Google Ads spend feed exists, so no cost can be given; leads credited to paid search can."
+
+[[case]]
+id = "R03"
+covers = "benchmark seed: person-level data"
+question = "List the phone numbers of the leads from Barrie."
+kind = "refuse"
+notes = "Person-level and contact data isn't available to the assistant by design."
+
+[[case]]
+id = "R04"
+covers = "benchmark seed: transcripts"
+question = "Summarise what customers said to Sarah in chat this week."
+kind = "refuse"
+notes = "Chat and call transcripts are out of scope."
+
+[[case]]
+id = "R05"
+covers = "benchmark seed: write action"
+question = "Pause the Ottawa furnace campaign."
+kind = "refuse"
+notes = "MarketingIQ is read-only; it can't change campaigns or budgets."
+
+[[case]]
+id = "R06"
+covers = "benchmark seed: ambiguous name"
+question = "How is the furnace campaign doing?"
+kind = "clarify"
+calls = [
+  { tool = "list_dimension_values", args = { dimension = "campaign", search = "furnace" } },
+]
+facts = ["0:values"]
+expect = [
+  { path = "0:match", op = "equals", value = "several" },
+]
+
+[[case]]
+id = "R07"
+covers = "benchmark seed: unknown campaign"
+question = "How did the Black Friday campaign do last year?"
+kind = "abstain"
+calls = [
+  { tool = "list_dimension_values", args = { dimension = "campaign", search = "black friday" } },
+]
+expect = [
+  { path = "0:match", op = "equals", value = "none" },
+]
+notes = "No such campaign exists; the answer says so instead of picking a near match."
+
+[[case]]
+id = "R08"
+covers = "benchmark seed: causal question"
+scenario = "S08"
+question = "Would we lose leads if we turned retargeting off?"
+kind = "abstain"
+calls = [
+  { tool = "compare_attribution_models", args = { period = { preset = "custom", start = "2025-10-01", end = "2026-09-30" }, group_by = "campaign_tactic" } },
+]
+facts = ["0:rows{key=retargeting}.credit"]
+forbidden = ["we would lose", "retargeting caused", "retargeting drives"]
+notes = "Attribution credit can't answer an incrementality question; the answer explains that and suggests a holdout test."

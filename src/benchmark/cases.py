@@ -1,0 +1,130 @@
+"""Benchmark cases: loading, validation, and the small path language they use."""
+
+import re
+import tomllib
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from marketingiq.analytics.performance import WARNING_MESSAGES
+from marketingiq.tools import TOOLS
+
+CASES = Path(__file__).with_name("cases.toml")
+
+
+class Call(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tool: str
+    args: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _valid(self) -> "Call":
+        if self.tool not in TOOLS:
+            raise ValueError(f"unknown tool {self.tool!r}")
+        TOOLS[self.tool].input_model.model_validate(self.args)
+        return self
+
+
+class Expect(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    op: Literal["equals", "contains", "startswith", "not_null", "gt", "lt"]
+    value: Any = None  # a string starting with "@" is another path
+
+
+class Case(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    covers: str
+    question: str
+    kind: Literal["answer", "clarify", "abstain", "refuse"]
+    scenario: str | None = None
+    calls: list[Call] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    facts: list[str] = Field(default_factory=list)
+    expect: list[Expect] = Field(default_factory=list)
+    forbidden: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "Case":
+        if self.kind == "refuse" and self.calls:
+            raise ValueError(f"{self.id}: a refusal makes no tool calls")
+        if self.kind != "refuse" and not self.calls:
+            raise ValueError(f"{self.id}: needs reference calls")
+        unknown = set(self.warnings) - set(WARNING_MESSAGES)
+        if unknown:
+            raise ValueError(f"{self.id}: unknown warning codes {sorted(unknown)}")
+        for path in [*self.facts, *(e.path for e in self.expect)]:
+            index, _ = split_path(path)
+            if index >= len(self.calls):
+                raise ValueError(f"{self.id}: {path!r} refers to a call that doesn't exist")
+        return self
+
+
+def load_cases(path: Path = CASES) -> list[Case]:
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    cases = [Case.model_validate(case) for case in raw["case"]]
+    ids = [case.id for case in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate case ids")
+    return cases
+
+
+# --- paths ------------------------------------------------------------------------------------
+#
+# "<call index>:<steps>", steps separated by dots. A step is a key, optionally followed by
+# [n] (list index, negative from the end) or {field=value} (the first list item whose field
+# equals value; true/false/numbers are compared as text). Example:
+#   1:rows{key=meta_prospecting_furnace}.values.cost_per_lead.value
+
+_STEP = re.compile(
+    r"^(?P<name>[^\[{]+)?(?:\[(?P<index>-?\d+)\]|\{(?P<field>[^=}]+)=(?P<want>[^}]*)\})?$"
+)
+
+
+class Missing(LookupError):
+    pass
+
+
+def split_path(path: str) -> tuple[int, str]:
+    index, _, rest = path.partition(":")
+    return int(index), rest
+
+
+def resolve(path: str, results: list[dict]) -> Any:
+    index, rest = split_path(path)
+    node: Any = results[index]
+    for step in rest.split("."):
+        match = _STEP.match(step)
+        if not match:
+            raise ValueError(f"bad path step {step!r}")
+        if match["name"]:
+            if not isinstance(node, dict) or match["name"] not in node:
+                raise Missing(f"{path}: no {match['name']!r}")
+            node = node[match["name"]]
+        if match["index"] is not None:
+            try:
+                node = node[int(match["index"])]
+            except (IndexError, TypeError, KeyError):
+                raise Missing(f"{path}: no item {match['index']}") from None
+        elif match["field"] is not None:
+            found = [
+                item
+                for item in node
+                if isinstance(item, dict) and _text(item.get(match["field"])) == match["want"]
+            ]
+            if not found:
+                raise Missing(f"{path}: no item with {match['field']}={match['want']}")
+            node = found[0]
+    return node
+
+
+def _text(value: Any) -> str:
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)

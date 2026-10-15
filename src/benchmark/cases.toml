@@ -77,14 +77,15 @@ question = "Over last heating season (September to February), was the Ottawa fur
 kind = "answer"
 calls = [
   { tool = "list_dimension_values", args = { dimension = "campaign", search = "prospecting furnace" } },
-  { tool = "get_performance", args = { period = { preset = "custom", start = "2025-09-01", end = "2026-02-28" }, group_by = ["campaign"], filters = { campaigns = ["meta_prospecting_furnace", "meta_prospecting_furnace_ottawa"] }, metrics = ["spend", "qualified_leads", "cost_per_qualified_lead"], attribution_model = "linear" } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2025-09-01", end = "2026-02-28" }, group_by = ["campaign"], filters = { platforms = ["meta"] }, metrics = ["spend", "qualified_leads", "cost_per_qualified_lead"] } },
 ]
-warnings = ["mapping_unverified"]
-facts = ["1:rows{key=meta_prospecting_furnace_ottawa}.values.cost_per_qualified_lead.value", "1:rows{key=meta_prospecting_furnace}.values.cost_per_qualified_lead.value", "1:resolved.attribution_model"]
+warnings = ["mapping_unverified", "small_cell_suppressed"]
+facts = ["1:rows{key=meta_prospecting_furnace}.values.cost_per_qualified_lead.value", "1:rows{key=meta_prospecting_furnace_ottawa}.values.spend.value"]
 expect = [
   { path = "0:match", op = "equals", value = "several" },
-  { path = "1:rows{key=meta_prospecting_furnace_ottawa}.values.cost_per_qualified_lead.value", op = "gt", value = "@1:rows{key=meta_prospecting_furnace}.values.cost_per_qualified_lead.value" },
+  { path = "1:rows{key=meta_prospecting_furnace_ottawa}.values.cost_per_qualified_lead.suppressed", op = "equals", value = true },
 ]
+notes = "Under the default (last non-direct) model, Ottawa's qualified leads are under 5, so its cost per qualified lead is hidden: the honest answer says it can't be compared. Under linear credit (a second call), Ottawa is far more expensive (S11); an answer that offers that view is better, not required."
 
 [[case]]
 id = "Q05"
@@ -200,7 +201,7 @@ calls = [
   { tool = "compare_attribution_models", args = { period = { preset = "last_12_months" }, group_by = "campaign_tactic" } },
 ]
 warnings = ["mapping_unverified", "low_attribution_coverage"]
-facts = ["0:rows{key=retargeting}.credit", "0:rows{key=prospecting}.credit", "0:evidence.journey_share"]
+facts = ["0:rows{key=retargeting}.credit.first_touch", "0:rows{key=retargeting}.credit.last_non_direct", "0:rows{key=retargeting}.credit.linear", "0:evidence.journey_share"]
 expect = [
   { path = "0:rows{key=retargeting}.credit.last_non_direct", op = "gt", value = "@0:rows{key=retargeting}.credit.first_touch" },
   { path = "0:rows{key=prospecting}.credit.first_touch", op = "gt", value = "@0:rows{key=prospecting}.credit.last_non_direct" },
@@ -321,7 +322,7 @@ calls = [
   { tool = "list_annotations", args = { annotation_type = "cold_snap", start = "2026-02-01", end = "2026-02-28" } },
   { tool = "get_performance", args = { period = { preset = "custom", start = "2026-02-09", end = "2026-02-14" }, compare_to = "previous_period", population = "all", group_by = ["lead_class"], metrics = ["leads"] } },
 ]
-facts = ["1:rows{key=service_demand}.values.leads", "1:rows{key=acquisition}.values.leads"]
+facts = ["1:rows{key=service_demand}.values.leads.change_pct", "1:rows{key=acquisition}.values.leads.change_pct"]
 expect = [
   { path = "1:rows{key=service_demand}.values.leads.change_pct", op = "gt", value = 1.0 },
   { path = "1:rows{key=service_demand}.values.leads.change_pct", op = "gt", value = "@1:rows{key=acquisition}.values.leads.change_pct" },

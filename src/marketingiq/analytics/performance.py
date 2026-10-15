@@ -135,6 +135,9 @@ class OrgContext:
     meta_timezones: list[str]
     maturity_days: float | None
     campaign_names: dict[str, str]
+    # Per spend dimension, the group values that have a spend feed (docs/metrics.md:
+    # a group without one has no spend, which is different from zero spend).
+    spend_feed_groups: dict[str, set[str]]
 
 
 def load_context(conn: Connection, org_slug: str) -> OrgContext:
@@ -186,6 +189,18 @@ def load_context(conn: Connection, org_slug: str) -> OrgContext:
     names = dict(
         conn.execute(text("SELECT key, name FROM core.campaigns WHERE org_id = :org"), params).all()
     )
+    fed = conn.execute(
+        text(
+            f"SELECT c.key, c.platform, {_SPEND_DIMENSIONS['campaign_tactic']},"
+            f" {_SPEND_DIMENSIONS['channel']}"
+            " FROM core.campaigns c WHERE c.org_id = :org AND c.has_spend_feed"
+        ),
+        params,
+    ).all()
+    spend_feed_groups = {
+        dimension: {row[i] for row in fed}
+        for i, dimension in enumerate(("campaign", "platform", "campaign_tactic", "channel"))
+    }
     return OrgContext(
         id=org.id,
         tz=ZoneInfo(org.reporting_tz),
@@ -198,6 +213,7 @@ def load_context(conn: Connection, org_slug: str) -> OrgContext:
         meta_timezones=meta_timezones,
         maturity_days=float(percentile) if closed >= MATURITY_MIN_CLOSED else None,
         campaign_names=names,
+        spend_feed_groups=spend_feed_groups,
     )
 
 
@@ -424,7 +440,23 @@ def measure(conn, ctx, query, period, population, families) -> Measured:
         for base, family in BASES.items():
             if family in families:
                 values.setdefault(base, None if family in unavailable else Decimal(0))
+    if "spend" in families and "spend" not in unavailable:
+        for key, values in rows.items():
+            if not _has_spend_feed(ctx, dimensions, key):
+                for base, family in BASES.items():
+                    if family == "spend":
+                        values[base] = None
     return Measured(rows, totals, unavailable)
+
+
+def _has_spend_feed(ctx, dimensions: list[str], key: tuple) -> bool:
+    """False when a group's value (a campaign, platform, tactic or channel) has no spend
+    feed at all: its spend is unknown, not zero. A paused campaign still has a feed."""
+    return all(
+        value in ctx.spend_feed_groups[dimension]
+        for dimension, value in zip(dimensions, key, strict=True)
+        if dimension in ctx.spend_feed_groups
+    )
 
 
 def _value(metric_name: str, values: dict[str, Decimal | None], measured: Measured, query) -> dict:
@@ -434,6 +466,8 @@ def _value(metric_name: str, values: dict[str, Decimal | None], measured: Measur
             return {"value": None, "null_reason": measured.unavailable[family]}
     if any(base in AMOUNT_BASES for base in metric.bases) and query.amount_basis is None:
         return {"value": None, "null_reason": "amount_basis_required"}
+    if any(BASES[b] == "spend" and values.get(b) is None for b in metric.bases):
+        return {"value": None, "null_reason": "no_spend_source"}
     if metric.base:
         return {"value": values.get(metric.base) or Decimal(0)}
     numerator = values.get(metric.numerator) or Decimal(0)

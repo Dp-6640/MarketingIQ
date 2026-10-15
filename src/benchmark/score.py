@@ -2,8 +2,9 @@
 
 What counts:
 - kind:      the run's status matches the case (answer ↔ answered, clarify, abstain, refuse)
-- obtained:  every fact the answer needs is in the run's tool results, however it got there
-             (the fact's value appears at the same path in a result of the same tool)
+- obtained:  every fact the answer needs is in the run's tool results, however it got there:
+             the fact's value is at the same path in any result, or the answer cites that
+             value (a cited value always comes from a tool, so this can't be faked)
 - cited:     of the facts that are single values, the share whose value the answer cites
 - caveats:   every required caveat is attached to the answer
 - forbidden: none of the case's forbidden phrases appear in the answer
@@ -93,14 +94,14 @@ def expected_facts(case: Case, reference_results: list[dict]) -> dict[str, Any]:
 
 def score(case: Case, run: Run, key: dict[str, Any]) -> Score:
     status = run.status
-    tools_by_call = {c.id: c.tool for c in run.calls if c.ok}
+    shown = [c.value for c in (run.rendered.citations if run.rendered else [])]
     obtained = 0
     for path, wanted in key.items():
-        index, rest = split_path(path)
-        tool = case.calls[index].tool
-        for call_id, result in run.results.items():
-            if tools_by_call.get(call_id) != tool:
-                continue
+        _, rest = split_path(path)
+        if citable(wanted) and any(_same(_value(s), wanted) for s in shown):
+            obtained += 1
+            continue
+        for result in run.results.values():
             try:
                 if _same(_value(walk(result, rest)), wanted):
                     obtained += 1
@@ -108,7 +109,6 @@ def score(case: Case, run: Run, key: dict[str, Any]) -> Score:
             except (Missing, ValueError, TypeError):
                 continue
 
-    shown = [c.value for c in (run.rendered.citations if run.rendered else [])]
     citable_facts = [v for v in key.values() if citable(v)]
     cited = sum(any(_same(_value(s), v) for s in shown) for v in citable_facts)
 

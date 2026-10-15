@@ -148,6 +148,8 @@ def render(draft: SubmitAnswer, results: dict[str, dict]) -> Rendered:
         if call not in results:
             rendered.errors.append(f"{match[0]}: there is no call {call}")
             return match[0]
+        if path.startswith("result."):
+            path = path.removeprefix("result.")  # copied from the tool-message wrapper
         context = (results[call].get("metric") or {}).get("unit")
         try:
             value, display = _cell(walk(results[call], path), path, context)

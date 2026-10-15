@@ -109,7 +109,8 @@ def test_campaign_rows_add_up_to_the_totals(world):
         )
 
     for base in ("leads", "spend", "sessions"):
-        assert sum(values[base] for values in measured.rows.values()) == measured.totals[base]
+        # Groups without a spend feed have no spend (None), and add nothing.
+        assert sum(values[base] or 0 for values in measured.rows.values()) == measured.totals[base]
 
 
 def test_cost_per_lead_is_spend_over_credited_leads(app_engine, world):
@@ -253,3 +254,16 @@ def test_invalid_queries_are_rejected(query):
 def test_period_spec_is_reused(world):
     assert PeriodSpec(preset="last_month").preset == "last_month"
     assert Path(world[1]).exists()
+
+
+def test_groups_without_a_spend_feed_have_no_spend_not_zero(app_engine):
+    result = perf(
+        app_engine, period=QUARTER, group_by=["platform"], metrics=["spend", "ctr", "leads"]
+    )
+
+    unfed = [r["values"] for r in result["rows"] if r["key"] != "meta"]  # no spend feed
+    assert unfed
+    for values in unfed:
+        assert values["spend"] == {"value": None, "null_reason": "no_spend_source"}
+        assert values["ctr"]["null_reason"] == "no_spend_source"
+    assert row(result, "meta")["spend"]["value"] > 0

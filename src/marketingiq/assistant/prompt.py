@@ -28,6 +28,10 @@ metric cell (…values.cost_per_lead) or one of its fields: .previous, .change, 
 .rank, .rank_of.
 - References render with their own unit and sign ($31.20, 51.9%, +24.8%): don't add a $, %, \
 plus or minus sign yourself.
+- In a compared result, `value` is the period asked about and `previous` is the comparison \
+period: "rose from {{{{…previous}}}} to {{{{…value}}}}". Check the direction before you write it.
+- Never print raw field values such as True, False or null; say what they mean. Don't restate \
+thresholds from caveats (they're attached for you).
 - Dates (2026-09-30, "September 2026") and years are fine as text. Instead of a count you \
 would have to type, refer to it (row_count, rank_of) or describe it in words ("a few", "most").
 

@@ -37,14 +37,15 @@ flowchart LR
     analytics --> api["API and tools<br/>typed, read-only"]:::built
     oracle["Oracle<br/>second implementation"]:::built -.->|checks| analytics
     files -.-> oracle
-    api --> llm["LLM answer<br/>numbers filled in"]:::next
+    api --> llm["LLM answer<br/>numbers filled in"]:::built
+    llm --> demo["Demo page<br/>every number traced"]:::built
     bench["Benchmark<br/>32 cases, answer key"]:::built -.->|judges| llm
     classDef built fill:#dbeafe,stroke:#2563eb,stroke-width:2px
     classDef next fill:#fff,stroke:#2563eb,stroke-width:2px,stroke-dasharray:5 4
     classDef planned fill:#fff,stroke:#9ca3af
 ```
 
-Numbers flow from files to answers; the LLM never computes them. Filled boxes exist today; the dashed box is next (Phase 4, the assistant). The benchmark was written first, so it can judge the assistant without being shaped by it. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
+Numbers flow from files to answers; the LLM never computes them. Everything shown now exists. Next is the first scored run with a real model. The benchmark was written before the assistant, so it judges the assistant without being shaped by it. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
 
 ### Progress log
 
@@ -52,6 +53,10 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-10-15 | `457e454` | Demo page: ask, see where every number came from |
+| 2026-10-15 | `a567118` | Benchmark scoring: run the assistant through every case |
+| 2026-10-15 | `015224b` | The assistant: any OpenAI-compatible model, numbers by reference |
+| 2026-10-15 | `da626b9` | Journal: step 11, the last tools and the benchmark |
 | 2026-10-15 | `9c34f15` | Benchmark: 32 cases with an answer key checked by the oracle |
 | 2026-10-15 | `7adc63f` | Tool registry, landing-page type, and a noise check on rate changes |
 | 2026-10-15 | `d8476ad` | Model comparison and dimension lookup |
@@ -385,6 +390,29 @@ After the fixes, the two implementations agree everywhere: 26 tests on the tiny 
 
 **Interview line:** "Before writing any LLM code, I wrote 32 benchmark cases with an answer key verified by an independent implementation. Writing them caught a business rule that could never fire and a planted effect too small to detect. So I added a significance check, and the assistant says 'no detectable change' instead of reporting noise."
 
+## Step 12: the assistant (Phase 4)
+
+**What we built** (`015224b` assistant, `a567118` benchmark scoring, `457e454` demo page):
+
+- **A model adapter for any OpenAI-compatible endpoint.** The default is Google Gemini's free tier (`gemini-3.5-flash-lite`). Groq, OpenRouter or a local Ollama is a configuration change.
+- **The run loop:** question → tool calls (validated, read-only) → `submit_answer`. Every step is stored in `app.assistant_runs` (migration 0005).
+- **Numbers by reference (ADR-006, now implemented).** The model writes `{{c1:rows[key=…].values.cost_per_lead}}` and the backend fills in "$31.20". A number the model types is rejected: one retry, then the run fails. Caveats come from the tools.
+- **`POST /api/v1/assistant/ask`**, a terminal command (`python -m marketingiq.assistant "…"`), and a demo page at `/` where every number is highlighted and traced to its tool call.
+- **Benchmark scoring:** `python -m benchmark run` puts the model through all 32 cases and scores response kind, facts obtained and cited, caveats and forbidden phrases.
+
+**Why:**
+
+- **Fabrication is made impossible, not just unlikely.** Checking an LLM's numbers after the fact is fuzzy. If the model can't type a number at all, every number in an answer provably came from a tool, and the run log shows which one.
+- **Validation errors go back to the model.** A wrong argument isn't a crash: the model sees "metrics.0: input should be one of…" and corrects itself. The same Pydantic models that protect the API guide the model.
+- **The provider is configuration.** One adapter fits several providers. Tool schemas are reduced to the subset every provider accepts (no `$ref`, no `anyOf`), and the full models still validate every call. Switching provider is configuration, and the benchmark can compare them.
+- **Free tier, synthetic data only.** Free tiers may use prompts for training. That's acceptable only because every number is fictional, and it's written down in the unverified register (U-14).
+- **The scorer is tested in both directions.** A scripted "reference agent" that replays the answer key through the real loop passes 32 of 32. That proves the scorer and the key agree, so a real model's failures are the model's. Unit tests prove each failure mode fails a case.
+- **Tests never need the network.** A `ScriptedModel` plays back fixed replies, so the run loop, retries, failures and the API are tested deterministically.
+
+**Concepts:** tool calling (function calling), agent loop, structured output, grounding, numbers by reference, provider abstraction, JSON Schema portability, prompt injection (tool results are data), test doubles (scripted model), run traces.
+
+**Interview line:** "The model never writes a number. It writes references into tool results and the backend fills them in, so a fabricated number is structurally impossible and every figure is traceable to a logged tool call. I proved the benchmark scorer with a reference agent that passes 32 of 32 before pointing it at a real model."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -441,6 +469,12 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | Statistical power | Whether there's enough data to detect an effect of a given size at all | Scenario S05 |
 | Entity resolution | Turning the words a person used into an exact value ("the furnace campaign" → a campaign key) | list_dimension_values |
 | Abstain vs refuse | Abstain: the data can't give this number, say why. Refuse: the request is out of scope by design. | Benchmark kinds |
+| Tool calling | The model asks for a named function with JSON arguments; the program runs it and returns the result | src/marketingiq/assistant/run.py |
+| Agent loop | Repeat: the model reads results, calls more tools, until it gives a final answer or hits a step limit | ask() |
+| Grounding | Every claim in an answer is backed by data the system retrieved, not the model's memory | Numbers by reference |
+| Prompt injection | Text inside data (a campaign name, a web page) that tries to give the model instructions | The prompt's last rule |
+| Test double | A stand-in for a real dependency in tests, here a scripted model | ScriptedModel |
+| Free tier | Free API access with rate limits, and often looser data terms: fine for fictional data only | U-14 |
 
 ## Interview talking points
 
@@ -468,4 +502,5 @@ These questions involve no company data, only how the systems are set up. Each a
 - [ ] Can the project use the company's name, or be shown publicly? Check your employment agreement and ask your manager. (U-23)
 - [ ] Is there a separate form for nominations, or do they come through the quote form? (U-20; they currently count as acquisition leads)
 - [ ] How many leads a month does each campaign really get? That decides whether hiding counts under 5 leaves useful campaign-level answers (U-15)
+- [ ] Create a free Gemini API key at aistudio.google.com/apikey and add `LLM_API_KEY=` to `.env`, then run `uv run python -m benchmark run --delay 5`
 - [ ] Does the performance marketing manager agree with the rule for "cheap leads that rarely qualify": cost per lead and qualification rate both below the median, among campaigns with at least 10 leads? (question 6)

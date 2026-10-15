@@ -16,6 +16,7 @@ Preset = Literal[
     "last_7_days",
     "last_30_days",
     "last_month",
+    "last_12_months",
     "month_to_date",
     "last_quarter",
     "quarter_to_date",
@@ -111,9 +112,10 @@ def resolve(spec: PeriodSpec, as_of: date) -> Period:
         return Period(_quarter_start(as_of), as_of)
     if spec.preset == "year_to_date":
         return Period(date(as_of.year, 1, 1), as_of)
-    if spec.preset == "last_month":
+    if spec.preset in ("last_month", "last_12_months"):
         end = as_of if as_of == _month_end(as_of) else _month_start(as_of) - timedelta(days=1)
-        return Period(_month_start(end), end)
+        months = 12 if spec.preset == "last_12_months" else 1
+        return Period(_add_months(_month_start(end), 1 - months), end)
     # last_quarter
     quarter_end = _month_end(_add_months(_quarter_start(as_of), 2))
     end = as_of if as_of == quarter_end else _quarter_start(as_of) - timedelta(days=1)
@@ -158,8 +160,10 @@ def period_warnings(
         )
         if comparison.days != period.days and not both_whole_months:
             warnings.append("unequal_periods")
-        # Home-services demand moves with the seasons: month-over-month mostly measures weather.
-        if kind == "previous_period" and period.days >= 28:
+        # Home-services demand moves with the seasons: comparing a month (or longer) with a
+        # different time of year mostly measures weather. Only a year apart is like for like.
+        year_apart = abs((period.start - comparison.start).days - 365) <= 7
+        if period.days >= 28 and period.days < 360 and not year_apart:
             warnings.append("seasonal_comparison")
     earliest = min(period.start, comparison.start) if comparison else period.start
     if data_start is not None and earliest < data_start:

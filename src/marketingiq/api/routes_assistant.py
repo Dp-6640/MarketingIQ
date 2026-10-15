@@ -8,7 +8,12 @@ from sqlalchemy import Engine
 
 from marketingiq.api.routes_analytics import Org
 from marketingiq.assistant.answer import REFERENCE
-from marketingiq.assistant.llm import ChatModel, ModelNotConfigured, get_chat_model
+from marketingiq.assistant.llm import (
+    ChatModel,
+    ModelNotConfigured,
+    ProviderQuotaExhausted,
+    get_chat_model,
+)
 from marketingiq.assistant.run import Run, ask
 from marketingiq.db import get_app_engine
 
@@ -70,4 +75,7 @@ def ask_question(
     model: Annotated[ChatModel, Depends(chat_model)],
     org: Org,
 ) -> dict[str, Any]:
-    return present(ask(body.question, engine=engine, org=org, model=model))
+    try:
+        return present(ask(body.question, engine=engine, org=org, model=model))
+    except ProviderQuotaExhausted as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None

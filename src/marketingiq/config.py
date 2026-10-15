@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     llm_api_key: SecretStr | None = None
     llm_model: str = "gemini-3.5-flash-lite"
+    # Requests are spaced to stay under the provider's per-minute limit (Gemini free: 15).
+    llm_requests_per_minute: int | None = 14
 
     @property
     def app_url(self) -> str:

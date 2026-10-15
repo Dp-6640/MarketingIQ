@@ -146,6 +146,10 @@ def ask(
             if call.name != "submit_answer":
                 content = _execute(run, call, engine, org)
                 messages.append({"role": "tool", "tool_call_id": call.id, "content": content})
+        if not submits and run.steps >= MAX_STEPS - 2:
+            messages.append(
+                {"role": "user", "content": "Finish now: call submit_answer with what you have."}
+            )
         for call in submits:
             answer_tries += 1
             feedback = _submit(run, call)

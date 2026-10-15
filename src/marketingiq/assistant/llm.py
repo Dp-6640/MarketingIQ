@@ -6,11 +6,13 @@ so switching provider is configuration (LLM_BASE_URL, LLM_API_KEY, LLM_MODEL). T
 """
 
 import json
+import re
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 from marketingiq.config import get_settings
 
@@ -57,19 +59,46 @@ class ChatModel(Protocol):
 class OpenAICompatible:
     """Any endpoint that speaks OpenAI's chat-completions API."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 90.0):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        timeout: float = 90.0,
+        requests_per_minute: int | None = None,
+        max_waits: int = 5,
+    ):
         self.name = model
         self._model = model
-        self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=3)
+        # Retries for rate limits are ours (they honour the provider's retry delay).
+        self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=2)
+        self._interval = 60.0 / requests_per_minute if requests_per_minute else 0.0
+        self._max_waits = max_waits
+
+    def _pace(self) -> None:
+        global _last_request
+        wait = _last_request + self._interval - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_request = time.monotonic()
 
     def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Reply:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,  # type: ignore[arg-type]
-            tools=tools,  # type: ignore[arg-type]
-            tool_choice="auto",
-            temperature=0,
-        )
+        for attempt in range(self._max_waits + 1):
+            self._pace()
+            try:
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages,  # type: ignore[arg-type]
+                    tools=tools,  # type: ignore[arg-type]
+                    tool_choice="auto",
+                    temperature=0,
+                )
+                break
+            except RateLimitError as exc:
+                detail = str(exc)
+                if "PerDay" in detail or attempt == self._max_waits:
+                    raise ProviderQuotaExhausted(_quota_message(detail)) from None
+                time.sleep(_retry_delay(detail))
         message = response.choices[0].message
         calls = [
             ToolCall(
@@ -118,6 +147,26 @@ class ModelNotConfigured(RuntimeError):
     pass
 
 
+class ProviderQuotaExhausted(RuntimeError):
+    """The provider's quota is used up (per day, or still per minute after waiting)."""
+
+
+# Requests are paced across every model instance in the process: the quota is per project.
+_last_request = 0.0
+
+
+def _retry_delay(detail: str) -> float:
+    """The provider's suggested wait ("retryDelay": "22s"), plus a margin; 30 s if none."""
+    match = re.search(r"retry[_ ]?delay['\"]?\s*[:=]\s*['\"]?(\d+(?:\.\d+)?)s", detail, re.I)
+    return float(match.group(1)) + 2 if match else 30.0
+
+
+def _quota_message(detail: str) -> str:
+    if "PerDay" in detail:
+        return "The model provider's daily free quota is used up; it resets at midnight Pacific."
+    return "The model provider is still rate-limiting after several waits; try again shortly."
+
+
 def get_chat_model() -> OpenAICompatible:
     """The configured model. Local endpoints (Ollama) need no key; any other endpoint does."""
     settings = get_settings()
@@ -128,4 +177,9 @@ def get_chat_model() -> OpenAICompatible:
             "LLM_API_KEY is not set. Add it to .env (see .env.example) to use the assistant."
         )
     key = key or "local"
-    return OpenAICompatible(settings.llm_base_url, key, settings.llm_model)
+    return OpenAICompatible(
+        settings.llm_base_url,
+        key,
+        settings.llm_model,
+        requests_per_minute=settings.llm_requests_per_minute,
+    )

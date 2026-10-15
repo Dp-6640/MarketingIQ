@@ -85,8 +85,9 @@ def bare_numerals(template: str) -> list[str]:
     return _NUMERAL.findall(text)
 
 
-def _unit(path: str) -> str:
-    """How to format the value a path points at, from the metric it names."""
+def _unit(path: str, context: str | None = None) -> str:
+    """How to format the value a path points at, from the metric it names. `context` is the
+    unit of a result about one metric (a change explanation), for its totals and effects."""
     steps = re.split(r"[.\[\]{}=]", path)
     last = next((s for s in reversed(steps) if s and s != "value"), "")
     metric = next((METRICS[s] for s in reversed(steps) if s in METRICS), None)
@@ -98,6 +99,8 @@ def _unit(path: str) -> str:
         return {"rate": "percent", "currency": "currency"}.get(metric.unit, "number")
     if any(n in last for n in _CURRENCY_NAMES):
         return "currency"
+    if context and steps[0] in ("total", "segments"):
+        return {"rate": "percent", "currency": "currency"}.get(context, "number")
     return "number"
 
 
@@ -117,7 +120,7 @@ def _format(value: Any, unit: str) -> str:
     return f"{value:,.2f}".rstrip("0").rstrip(".")
 
 
-def _cell(node: Any, path: str) -> tuple[Any, str]:
+def _cell(node: Any, path: str, context: str | None = None) -> tuple[Any, str]:
     """A cell ({"value": ...}) or a named part ({"name": "spend", "value": ...}) gives its
     value; hidden and missing values say why instead of showing a number."""
     if isinstance(node, dict) and "value" in node:
@@ -125,11 +128,11 @@ def _cell(node: Any, path: str) -> tuple[Any, str]:
             return None, "hidden (fewer than 5)"
         if node["value"] is None:
             return None, f"not available ({node.get('null_reason', 'no value')})"
-        unit = _unit(f"{path}.{node['name']}" if "name" in node else path)
+        unit = _unit(f"{path}.{node['name']}", None) if "name" in node else _unit(path, context)
         return node["value"], _format(node["value"], unit)
     if isinstance(node, (dict, list)):
         raise ValueError("points at a group of values, not one value")
-    return node, _format(node, _unit(path)) if node is not None else "not available"
+    return node, _format(node, _unit(path, context)) if node is not None else "not available"
 
 
 def render(draft: SubmitAnswer, results: dict[str, dict]) -> Rendered:
@@ -145,15 +148,17 @@ def render(draft: SubmitAnswer, results: dict[str, dict]) -> Rendered:
         if call not in results:
             rendered.errors.append(f"{match[0]}: there is no call {call}")
             return match[0]
+        context = (results[call].get("metric") or {}).get("unit")
         try:
-            value, display = _cell(walk(results[call], path), path)
+            value, display = _cell(walk(results[call], path), path, context)
         except (Missing, ValueError) as exc:
             rendered.errors.append(f"{match[0]}: {exc}")
             return match[0]
         rendered.citations.append(Citation(match[0], call, path, value, display))
         return display
 
-    rendered.text = REFERENCE.sub(substitute, draft.answer)
+    # A reference brings its own unit; "{{…change_pct}}%" would otherwise show "12.0%%".
+    rendered.text = REFERENCE.sub(substitute, draft.answer).replace("%%", "%")
     codes = []
     for result in results.values():
         for warning in result.get("warnings", []):

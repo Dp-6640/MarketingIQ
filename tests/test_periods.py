@@ -28,6 +28,8 @@ AS_OF = date(2026, 9, 30)  # the default synthetic dataset's data_as_of: a month
         ("last_quarter", date(2026, 8, 10), Period(date(2026, 4, 1), date(2026, 6, 30))),
         ("quarter_to_date", date(2026, 8, 10), Period(date(2026, 7, 1), date(2026, 8, 10))),
         ("year_to_date", AS_OF, Period(date(2026, 1, 1), AS_OF)),
+        ("last_12_months", AS_OF, Period(date(2025, 10, 1), AS_OF)),
+        ("last_12_months", date(2026, 9, 15), Period(date(2025, 9, 1), date(2026, 8, 31))),
     ],
 )
 def test_presets_resolve_against_data_as_of(preset, as_of, expected):
@@ -93,12 +95,23 @@ def test_warnings_for_seasonal_unequal_and_incomplete_comparisons():
     assert "unequal_periods" in period_warnings(march, uneven, "custom", data_start)
     last_year = comparison_period(march, "same_period_last_year")
     assert period_warnings(march, last_year, "same_period_last_year", data_start) == []
-    early = comparison_period(
-        Period(date(2024, 12, 1), date(2024, 12, 31)), "same_period_last_year"
-    )
-    assert period_warnings(march, early, "same_period_last_year", data_start) == [
+    december = Period(date(2024, 12, 1), date(2024, 12, 31))
+    early = comparison_period(december, "same_period_last_year")
+    assert period_warnings(december, early, "same_period_last_year", data_start) == [
         "source_incomplete"
     ]
+
+
+def test_any_month_compared_with_a_different_time_of_year_is_seasonal():
+    march = Period(date(2026, 3, 1), date(2026, 3, 31))
+    february = Period(date(2026, 2, 1), date(2026, 2, 28))
+    after = Period(date(2026, 5, 12), date(2026, 6, 10))
+    before = Period(date(2026, 4, 12), date(2026, 5, 11))
+    week = Period(date(2026, 2, 9), date(2026, 2, 14))
+
+    assert "seasonal_comparison" in period_warnings(march, february, "custom", None)
+    assert "seasonal_comparison" in period_warnings(after, before, "custom", None)
+    assert "seasonal_comparison" not in period_warnings(week, week, "custom", None)
 
 
 def test_utc_bounds_follow_the_reporting_time_zone():

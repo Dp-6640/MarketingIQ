@@ -9,7 +9,8 @@ What counts:
 - forbidden: none of the case's forbidden phrases appear in the answer
 
 A case passes on kind, obtained, caveats and forbidden. Citing is reported as a share: an
-answer can be right without quoting every supporting number.
+answer can be right without quoting every supporting number. Facts are required only for
+answers and clarifications: an abstention or refusal is judged on the decision it makes.
 """
 
 import json
@@ -113,7 +114,9 @@ def score(case: Case, run: Run, key: dict[str, Any]) -> Score:
 
     codes = {c["code"] for c in (run.rendered.caveats if run.rendered else [])}
     text = (run.answer or "").lower()
-    needs_facts = case.kind != "refuse"
+    # Answers and clarifications are built from facts. An abstention or refusal is judged on
+    # the decision itself; facts it could have quoted are reported as cited, not required.
+    needs_facts = case.kind in ("answer", "clarify")
     return Score(
         case=case.id,
         status=status,

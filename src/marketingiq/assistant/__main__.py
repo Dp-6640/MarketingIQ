@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from marketingiq.assistant.llm import ModelNotConfigured, get_chat_model
+from marketingiq.assistant.llm import ModelNotConfigured, ProviderQuotaExhausted, get_chat_model
 from marketingiq.assistant.run import ask
 from marketingiq.config import get_settings
 from marketingiq.db import get_app_engine
@@ -20,7 +20,10 @@ def main() -> None:
     except ModelNotConfigured as exc:
         sys.exit(str(exc))
 
-    run = ask(args.question, engine=get_app_engine(), org=args.org, model=model)
+    try:
+        run = ask(args.question, engine=get_app_engine(), org=args.org, model=model)
+    except ProviderQuotaExhausted as exc:
+        sys.exit(str(exc))
     if args.trace:
         for call in run.calls:
             status = call.id if call.ok else f"failed: {call.error}"

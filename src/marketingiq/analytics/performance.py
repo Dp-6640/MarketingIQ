@@ -585,6 +585,10 @@ WARNING_MESSAGES = {
     "unequal_periods": "The two periods have different lengths.",
     "source_incomplete": "Part of the requested period is before the data starts.",
     "small_cell_suppressed": "Counts under 5 are hidden to protect privacy.",
+    "unmapped_campaigns": "Some campaign traffic or spend can't be linked to a campaign in "
+    "the mapping sheet.",
+    "capture_drop": "Tracking capture on web forms fell sharply in at least one week; fewer "
+    "attributed leads that week reflect broken tracking, not fewer customers.",
     "sources_not_additive": "Meta, GA4 and Salesforce each count leads their own way; compare "
     "them side by side, never add them.",
 }

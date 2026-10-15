@@ -5,6 +5,7 @@ import json
 import pytest
 
 from marketingiq.assistant.answer import SubmitAnswer, bare_numerals, render
+from marketingiq.assistant.llm import Reply, ToolCall
 from marketingiq.assistant.paths import walk
 from marketingiq.assistant.schemas import tool_definitions
 from marketingiq.tools import TOOLS
@@ -95,3 +96,13 @@ def test_tool_schemas_use_only_the_portable_subset():
     assert {d["function"]["name"] for d in definitions} == {*TOOLS, "submit_answer"}
     for forbidden in ("$ref", "$defs", "anyOf", "additionalProperties", "title", '"format"'):
         assert forbidden not in text
+
+
+def test_provider_fields_on_a_tool_call_are_sent_back_unchanged():
+    signature = {"extra_content": {"google": {"thought_signature": "abc"}}}
+    reply = Reply(None, [ToolCall("call_1", "get_performance", "{}", signature)])
+
+    sent = reply.as_message()["tool_calls"][0]
+
+    assert sent["extra_content"] == signature["extra_content"]
+    assert sent["function"] == {"name": "get_performance", "arguments": "{}"}

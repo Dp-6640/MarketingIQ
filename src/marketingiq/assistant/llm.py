@@ -20,6 +20,9 @@ class ToolCall:
     id: str
     name: str
     arguments: str  # JSON text, exactly as the model wrote it
+    # Provider-specific fields on the call, sent back unchanged with the conversation.
+    # Gemini requires its thought signature (extra_content.google.thought_signature) back.
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,7 @@ class Reply:
         if self.tool_calls:
             message["tool_calls"] = [
                 {
+                    **call.extra,
                     "id": call.id,
                     "type": "function",
                     "function": {"name": call.name, "arguments": call.arguments},
@@ -68,7 +72,12 @@ class OpenAICompatible:
         )
         message = response.choices[0].message
         calls = [
-            ToolCall(call.id, call.function.name, call.function.arguments or "{}")
+            ToolCall(
+                call.id,
+                call.function.name,
+                call.function.arguments or "{}",
+                dict(call.model_extra or {}),
+            )
             for call in message.tool_calls or []
             if call.type == "function"
         ]

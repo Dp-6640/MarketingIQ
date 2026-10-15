@@ -41,8 +41,8 @@ In this order (each step is a function in `rules.py` with its own tests):
 2. **Linked campaign**: the native Meta campaign id if present, otherwise the captured UTM campaign.
 3. **Request type**: the CRM field if recorded; otherwise the entry-point default (quote form and booking → `install_replace`, U-20); otherwise the linked campaign's tactic; otherwise `unknown`. The source is stored in `request_type_source`.
 4. **Customer type**: the recorded Yes/No answer, else `unknown`.
-5. **Service line**: the CRM field, then the form's page, then the linked campaign's single service line.
-6. **City and region**: cleaned spelling, known aliases, or a region-only match ("KW"); anything else stays `unrecognized` and the raw text is kept.
+5. **Service line**: the CRM field, then the form's page, then the linked campaign's single service line. A form page gives a service line in two ways: a service page in the rule book's page map (`/heating/furnaces/` → `furnace`), or an offer page whose slug names one (`/offers/heat-pump/` → `heat_pump`, hyphens read as underscores).
+6. **City and region**: cleaned spelling, known aliases, or a region-only match ("KW"); anything else stays `unrecognized` and the raw text is kept. Cleaning collapses repeated spaces, ignores case, and drops a trailing province ("Toronto, Ontario", "Vaughan ON" → Toronto, Vaughan).
 7. **Duplicates**: the same person within 72 hours of their first lead. Only the first lead counts.
 8. **Class**: the ordered rules in `docs/lifecycle_and_classification.md`.
 9. **Evidence tier** (first leads only): T1 journey → T3 platform-native → T2 captured source → T4 self-reported channel → T5 none, as in `docs/attribution.md`.

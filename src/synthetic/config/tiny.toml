@@ -1,0 +1,142 @@
+# Small world for fast integration tests. Inherits everything from default.toml except what
+# is set here. Every value is a synthetic assumption.
+
+extends = "default"
+name = "tiny"
+campaign_modifiers = []
+
+[window]
+start = 2026-01-01
+end = 2026-03-31
+data_as_of = 2026-03-31
+burn_in_days = 14
+
+[meta_account]
+# Deliberately differs from the reporting time zone, to exercise timezone_mismatch handling.
+timezone = "America/Los_Angeles"
+
+[traffic]
+demand_households_per_day = 4.0
+no_need_sessions_per_day = 8.0
+
+[[regions]]
+key = "gta"
+name = "Greater Toronto Area"
+share = 1.0
+cities = [
+    { name = "Toronto", weight = 0.60, slug = "toronto", aliases = ["T.O."] },
+    { name = "Mississauga", weight = 0.40, slug = "mississauga" },
+]
+
+[[campaigns]]
+key = "meta_prospecting_furnace"
+display_name = "Prospecting | Furnace | Ontario"
+platform = "meta"
+platform_campaign_id = "120200000000000101"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_furnace"
+service_lines = { furnace = 1.0 }
+daily_budget = 10.0
+cpm = 11.0
+link_ctr = 0.012
+audience_quality = 0.020
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_lead_form_furnace_promo"
+display_name = "Lead Form | Furnace Promo"
+platform = "meta"
+platform_campaign_id = "120200000000000105"
+tactic = "lead_form"
+utm_campaign = "meta_lead_form_furnace_promo"
+service_lines = { furnace = 1.0 }
+daily_budget = 8.0
+cpm = 9.0
+link_ctr = 0.006
+form_completion = 0.040
+
+[[campaigns]]
+key = "meta_retargeting_all"
+display_name = "Retargeting | All Services"
+platform = "meta"
+platform_campaign_id = "120200000000000107"
+tactic = "retargeting"
+utm_campaign = "meta_retargeting_all"
+daily_budget = 5.0
+cpm = 15.0
+link_ctr = 0.018
+need_click_share = 0.25
+landing = "meta_retargeting"
+
+[[campaigns]]
+key = "meta_messaging_general"
+display_name = "Messenger | General"
+platform = "meta"
+platform_campaign_id = "120200000000000108"
+tactic = "messaging"
+utm_campaign = "meta_messaging_general"
+daily_budget = 5.0
+cpm = 9.0
+link_ctr = 0.009
+conversation_to_lead = 0.025
+
+[[campaigns]]
+key = "meta_prospecting_summer_test"
+display_name = "Prospecting | Summer Test"
+platform = "meta"
+platform_campaign_id = "120200000000000111"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_summer_test"
+service_lines = { air_conditioner = 0.5, heat_pump = 0.5 }
+start = 2026-02-15
+daily_budget = 6.0
+cpm = 11.0
+link_ctr = 0.011
+audience_quality = 0.016
+landing = "meta_prospecting"
+mapped = false
+
+[[campaigns]]
+key = "search_paid_generic"
+display_name = "Search | Generic"
+platform = "google_ads"
+tactic = "search"
+utm_campaign = "search_generic"
+
+[[campaigns]]
+key = "email_newsletter"
+display_name = "Email | Newsletter"
+platform = "email"
+tactic = "email"
+utm_campaign = "email_newsletter"
+
+[[demand_events]]
+id = "S03b"
+kind = "cold_snap"
+label = "Cold snap"
+start = 2026-02-09
+end = 2026-02-14
+need_multipliers = { emergency_repair = 3.0, existing_service = 2.0 }
+repair_service_mix = { furnace = 0.85, water_heater = 0.15 }
+
+[[demand_events]]
+id = "S10"
+kind = "billing_change"
+label = "Billing system change"
+start = 2026-01-12
+end = 2026-01-31
+need_multipliers = { billing = 4.0 }
+
+[[page_changes]]
+id = "S05"
+label = "Location pages redesigned"
+date = 2026-03-01
+path_prefix = "/locations/"
+conversion_multiplier = 1.2
+clarity_friction_multiplier = 0.6
+
+[[capture_outages]]
+id = "S06"
+label = "Hidden-field capture broken"
+start = 2026-03-10
+end = 2026-03-15

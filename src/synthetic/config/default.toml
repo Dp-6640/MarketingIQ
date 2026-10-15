@@ -1,0 +1,694 @@
+# Synthetic world for MarketingIQ.
+#
+# EVERY value in this file is an invented assumption. None of it describes LG Home Comfort.
+# docs/synthetic-data.md is the human-readable version; keep the two in sync.
+
+name = "default"
+
+[window]
+start = 2024-10-01
+end = 2026-09-30
+data_as_of = 2026-09-30
+# Simulated before `start` so early journeys already have history; never exported.
+burn_in_days = 30
+
+[organization]
+slug = "synthetic-home-services"
+name = "Synthetic Ontario Home Services (fictional)"
+reporting_tz = "America/Toronto"
+currency = "CAD"
+# Reserved example domain: the business is fictional.
+site = "https://homeservices.example"
+
+[meta_account]
+account_id = "act_100000000001"
+timezone = "America/Toronto"
+attribution_setting = "7d_click_1d_view"
+click_window_days = 7
+# Extra leads Meta claims through ad views, per click-attributed lead (scenario S07).
+view_through_rate = 0.35
+# Share of link clicks that turn into a website session.
+landing_rate = 0.92
+
+[traffic]
+# Households with a need that make contact on their own (not via a Meta ad), all regions,
+# per day, before seasonality, weekday, growth and event multipliers.
+demand_households_per_day = 22.0
+# Website sessions from visitors with no need (job seekers, browsers, ...).
+no_need_sessions_per_day = 75.0
+growth_per_year = 0.08
+growth_by_service = { heat_pump = 0.25 }
+# Monday first.
+weekday = [1.20, 1.15, 1.10, 1.05, 1.00, 0.80, 0.70]
+analytics_consent_rate = 0.80
+# Share of paid-search / Meta clicks whose URL carries a gclid / fbclid.
+click_id_rate = 0.95
+# Share of Meta click URLs whose utm_campaign was typed in a different letter case.
+utm_case_variant_rate = 0.05
+journey_cap_days = 45
+# Phone leads after a website visit: share whose last session recorded a click-to-call.
+phone_click_on_last_session = 0.40
+device_mix = { mobile = 0.62, desktop = 0.33, tablet = 0.05 }
+no_need_channels = { organic_search = 0.45, direct = 0.30, referral = 0.10, organic_social = 0.10, email = 0.05 }
+# Channel of the 2nd, 3rd, ... visit in a household's journey.
+later_touch_channels = { direct = 0.45, organic_search = 0.25, paid_search = 0.10, email = 0.08, referral = 0.05, organic_social = 0.07 }
+# Per-session chance of these events when they don't lead to a recorded lead.
+ambient_events = { phone_click = 0.02, chat_start = 0.01, booking_click = 0.005 }
+# Campaign behind each tagged non-Meta channel.
+channel_campaigns = { paid_search = "search_paid_generic", email = "email_newsletter" }
+# Who clicks a Meta prospecting ad and turns out to have a need.
+meta_prospect_needs = { planned_replacement = 0.85, research = 0.15 }
+# Who submits a Meta lead form or starts a Messenger conversation that becomes a lead.
+meta_native_needs = { planned_replacement = 0.55, research = 0.45 }
+
+[sources]
+organic_search = { google = 0.90, bing = 0.10 }
+referral = { "homestars.com" = 0.50, "yelp.ca" = 0.30, "nextdoor.com" = 0.20 }
+organic_social = { "m.facebook.com" = 0.60, "l.instagram.com" = 0.40 }
+meta = { facebook = 0.70, instagram = 0.30 }
+
+[hours]
+# Relative weight of each local hour, 00:00 first.
+web = [0.6, 0.3, 0.2, 0.1, 0.1, 0.3, 0.8, 1.5, 2.5, 3.5, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.5, 5.0, 5.0, 4.0, 3.0, 1.5]
+anytime = [1.0, 0.8, 0.8, 0.8, 0.8, 1.0, 1.5, 2.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.5, 2.0, 1.5, 1.2]
+business = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 2.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 2.0, 1.0, 0.5, 0.0, 0.0, 0.0, 0.0]
+
+# --- household needs ---------------------------------------------------------------------
+# share: share of demand households.  intent: Beta(a, b), drives conversion and qualification.
+# web_share: households that visit the website at all; the rest make contact offline.
+# Sessions per journey = 1 + Poisson(sessions_extra_mean), spread over a lognormal span.
+# P(lead) = convert_base + convert_intent_slope * intent.
+# entry_points apply to households with website sessions; offline_entry_points to the rest.
+
+[needs.planned_replacement]
+share = 0.30
+existing_customer_share = 0.08
+intent = [4.0, 3.0]
+web_share = 0.85
+sessions_extra_mean = 2.5
+journey_median_days = 7.0
+convert_base = 0.25
+convert_intent_slope = 0.70
+service_mix = "acquisition"
+hours = "web"
+first_touch = { organic_search = 0.45, paid_search = 0.20, direct = 0.15, referral = 0.10, organic_social = 0.05, email = 0.05 }
+# With offline households all calling, phone ends up near 25% of new-customer leads.
+entry_points = { phone = 0.17, web_quote_form = 0.415, web_callback_form = 0.166, booking = 0.111, web_chat_agent = 0.11, email_sms = 0.028 }
+offline_entry_points = { phone = 1.0 }
+requests = { install_replace = 0.90, sales_general = 0.10 }
+
+[needs.emergency_repair]
+share = 0.25
+existing_customer_share = 0.30
+intent = [8.0, 2.0]
+web_share = 0.60
+sessions_extra_mean = 0.0
+journey_median_days = 0.0
+convert_base = 0.95
+convert_intent_slope = 0.0
+service_mix = "repair"
+hours = "anytime"
+first_touch = { organic_search = 0.50, paid_search = 0.25, direct = 0.20, referral = 0.05 }
+# With offline households all calling: phone ~70%, callback ~15%, chat ~10%, other ~5% overall.
+entry_points = { phone = 0.50, web_callback_form = 0.25, web_chat_agent = 0.17, other = 0.08 }
+offline_entry_points = { phone = 1.0 }
+requests = { repair_service = 1.0 }
+
+[needs.research]
+share = 0.20
+existing_customer_share = 0.05
+intent = [1.5, 6.0]
+web_share = 1.0
+sessions_extra_mean = 0.8
+journey_median_days = 5.0
+convert_base = 0.0
+convert_intent_slope = 0.15
+service_mix = "acquisition"
+hours = "web"
+first_touch = { organic_search = 0.60, direct = 0.10, referral = 0.15, organic_social = 0.15 }
+entry_points = { web_quote_form = 0.60, web_chat_agent = 0.40 }
+offline_entry_points = { phone = 1.0 }
+requests = { install_replace = 0.90, sales_general = 0.10 }
+
+[needs.existing_service]
+share = 0.15
+existing_customer_share = 1.0
+intent = [8.0, 2.0]
+web_share = 0.30
+sessions_extra_mean = 0.0
+journey_median_days = 0.0
+convert_base = 0.95
+convert_intent_slope = 0.0
+service_mix = "repair"
+hours = "business"
+first_touch = { direct = 0.70, organic_search = 0.20, email = 0.10 }
+entry_points = { phone = 0.40, web_callback_form = 0.50, web_chat_agent = 0.10 }
+offline_entry_points = { phone = 1.0 }
+requests = { maintenance = 0.60, repair_service = 0.40 }
+
+[needs.billing]
+share = 0.07
+existing_customer_share = 1.0
+intent = [8.0, 2.0]
+web_share = 0.50
+sessions_extra_mean = 0.0
+journey_median_days = 0.0
+convert_base = 0.98
+convert_intent_slope = 0.0
+hours = "business"
+first_touch = { direct = 0.80, organic_search = 0.20 }
+entry_points = { web_callback_form = 0.80, phone = 0.20 }
+offline_entry_points = { phone = 1.0 }
+requests = { billing = 0.70, customer_service = 0.30 }
+
+[needs.junk]
+share = 0.03
+existing_customer_share = 0.0
+intent = [1.0, 9.0]
+web_share = 1.0
+sessions_extra_mean = 0.0
+journey_median_days = 0.0
+convert_base = 1.0
+convert_intent_slope = 0.0
+hours = "anytime"
+first_touch = { direct = 0.50, organic_search = 0.30, referral = 0.20 }
+entry_points = { web_quote_form = 0.50, web_callback_form = 0.30, web_chat_agent = 0.20 }
+offline_entry_points = { phone = 1.0 }
+# Spam submissions and non-sales forms such as nominations.
+requests = { spam = 0.70, non_sales_form = 0.30 }
+
+[service_mixes]
+acquisition = { furnace = 0.30, air_conditioner = 0.20, heat_pump = 0.15, water_heater = 0.15, water_treatment = 0.08, air_quality = 0.05, security = 0.04, generator = 0.02, maintenance_plan = 0.01 }
+repair = { furnace = 0.45, air_conditioner = 0.30, heat_pump = 0.10, water_heater = 0.15 }
+
+[seasonality]
+# Monthly index, January first; normalized to an average of 1 in code. Missing = flat.
+furnace = [1.5, 1.4, 1.0, 0.7, 0.5, 0.4, 0.4, 0.5, 0.9, 1.4, 1.6, 1.6]
+air_conditioner = [0.3, 0.3, 0.5, 0.9, 1.5, 2.0, 2.1, 1.6, 0.9, 0.5, 0.3, 0.3]
+heat_pump = [0.8, 0.8, 1.1, 1.3, 1.2, 1.0, 0.9, 0.9, 1.1, 1.2, 1.0, 0.8]
+water_heater = [1.1, 1.1, 1.0, 1.0, 0.9, 0.9, 0.9, 0.9, 1.0, 1.0, 1.1, 1.1]
+air_quality = [1.0, 1.0, 1.0, 1.2, 1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+# --- regions ---------------------------------------------------------------------------
+# Place names and location-page slugs follow the public website; all volumes are invented.
+
+[[regions]]
+key = "gta"
+name = "Greater Toronto Area"
+share = 0.55
+cities = [
+    { name = "Toronto", weight = 0.40, slug = "toronto", aliases = ["T.O."] },
+    { name = "Mississauga", weight = 0.15, slug = "mississauga", aliases = ["Sauga"] },
+    { name = "Brampton", weight = 0.12, slug = "brampton" },
+    { name = "Vaughan", weight = 0.08, slug = "vaughan", aliases = ["Woodbridge"] },
+    { name = "Markham", weight = 0.08, slug = "markham" },
+    { name = "Oakville", weight = 0.06, slug = "oakville" },
+    { name = "Ajax", weight = 0.04, slug = "ajax" },
+    { name = "Oshawa", weight = 0.04, slug = "oshawa" },
+    { name = "Milton", weight = 0.03, slug = "milton" },
+]
+
+[[regions]]
+key = "hamilton_niagara"
+name = "Hamilton-Niagara"
+share = 0.10
+cities = [
+    { name = "Hamilton", weight = 0.45, slug = "hamilton" },
+    { name = "Burlington", weight = 0.20, slug = "burlington" },
+    { name = "St. Catharines", weight = 0.20, slug = "st-catharines", aliases = ["St Catharines", "Saint Catharines"] },
+    { name = "Niagara Falls", weight = 0.15, slug = "niagara" },
+]
+
+[[regions]]
+key = "ottawa"
+name = "Ottawa"
+share = 0.12
+cities = [
+    { name = "Ottawa", weight = 0.85, slug = "ottawa" },
+    { name = "Kanata", weight = 0.15 },
+]
+
+[[regions]]
+key = "kw_guelph"
+name = "Kitchener-Waterloo-Guelph"
+share = 0.08
+cities = [
+    { name = "Kitchener", weight = 0.45, slug = "kitchener", aliases = ["KW"] },
+    { name = "Waterloo", weight = 0.30, slug = "waterloo", aliases = ["KW"] },
+    { name = "Guelph", weight = 0.25 },
+]
+
+[[regions]]
+key = "london_windsor"
+name = "London-Windsor"
+share = 0.08
+cities = [
+    { name = "London", weight = 0.60, slug = "london" },
+    { name = "Windsor", weight = 0.40, slug = "windsor" },
+]
+
+[[regions]]
+key = "barrie_simcoe"
+name = "Barrie-Simcoe"
+share = 0.05
+cities = [
+    { name = "Barrie", weight = 0.70, slug = "barrie" },
+    { name = "Bradford", weight = 0.30, slug = "bradford" },
+]
+
+[[regions]]
+key = "northern_other"
+name = "Northern and other"
+share = 0.02
+cities = [
+    { name = "Sudbury", weight = 0.40 },
+    { name = "North Bay", weight = 0.25 },
+    { name = "Parry Sound", weight = 0.15 },
+    { name = "Kenora", weight = 0.10 },
+    { name = "Owen Sound", weight = 0.10 },
+]
+
+# --- website ---------------------------------------------------------------------------
+
+[pages]
+home = "/"
+quote = "/get-a-quote/"
+careers = "/careers/"
+blog = "/blog/"
+location_prefix = "/locations/"
+offer_prefix = "/offers/"
+
+[pages.service]
+furnace = "/heating/furnaces/"
+air_conditioner = "/cooling/air-conditioners/"
+heat_pump = "/heating-cooling/heat-pumps/"
+water_heater = "/water/water-heaters/"
+water_treatment = "/water/water-treatment/"
+air_quality = "/air-quality/"
+security = "/home-security/"
+generator = "/generators/"
+maintenance_plan = "/maintenance-plan/"
+
+# Landing-page mix per traffic channel (and per Meta campaign profile).
+[landing]
+organic_search = { service = 0.50, location = 0.25, home = 0.25 }
+paid_search = { service = 0.60, location = 0.30, home = 0.10 }
+direct = { home = 0.70, quote = 0.10, service = 0.20 }
+referral = { home = 0.50, location = 0.30, service = 0.20 }
+organic_social = { offer = 0.50, home = 0.50 }
+email = { offer = 0.70, service = 0.30 }
+meta_prospecting = { offer = 0.60, service = 0.40 }
+meta_retargeting = { offer = 0.50, quote = 0.50 }
+no_need = { home = 0.40, service = 0.30, location = 0.15, careers = 0.10, blog = 0.05 }
+
+# --- campaigns -------------------------------------------------------------------------
+# Fictional. Meta: daily_budget and cpm in CAD; link_ctr = link clicks / impressions.
+# Total Meta spend averages roughly CAD 4,500 a month, scaled with the rest of this small world.
+
+[[campaigns]]
+key = "meta_prospecting_furnace"
+display_name = "Prospecting | Furnace | Ontario"
+platform = "meta"
+platform_campaign_id = "120200000000000101"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_furnace"
+service_lines = { furnace = 1.0 }
+seasons = [["09-01", "02-28"]]
+daily_budget = 45.0
+cpm = 11.0
+link_ctr = 0.012
+audience_quality = 0.020
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_prospecting_ac"
+display_name = "Prospecting | Air Conditioning | Ontario"
+platform = "meta"
+platform_campaign_id = "120200000000000102"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_ac"
+service_lines = { air_conditioner = 1.0 }
+seasons = [["04-01", "08-31"]]
+daily_budget = 40.0
+cpm = 11.0
+link_ctr = 0.012
+audience_quality = 0.020
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_prospecting_heatpump"
+display_name = "Prospecting | Heat Pump | Ontario"
+platform = "meta"
+platform_campaign_id = "120200000000000103"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_heatpump"
+service_lines = { heat_pump = 1.0 }
+daily_budget = 25.0
+cpm = 12.0
+link_ctr = 0.011
+audience_quality = 0.018
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_prospecting_water"
+display_name = "Prospecting | Water | Ontario"
+platform = "meta"
+platform_campaign_id = "120200000000000104"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_water"
+service_lines = { water_heater = 0.65, water_treatment = 0.35 }
+daily_budget = 15.0
+cpm = 10.0
+link_ctr = 0.010
+audience_quality = 0.015
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_lead_form_furnace_promo"
+display_name = "Lead Form | Furnace Promo"
+platform = "meta"
+platform_campaign_id = "120200000000000105"
+tactic = "lead_form"
+utm_campaign = "meta_lead_form_furnace_promo"
+service_lines = { furnace = 1.0 }
+seasons = [["10-01", "12-31"]]
+daily_budget = 45.0
+cpm = 9.0
+link_ctr = 0.006
+form_completion = 0.040
+
+[[campaigns]]
+key = "meta_lead_form_ac_promo"
+display_name = "Lead Form | AC Promo"
+platform = "meta"
+platform_campaign_id = "120200000000000106"
+tactic = "lead_form"
+utm_campaign = "meta_lead_form_ac_promo"
+service_lines = { air_conditioner = 1.0 }
+seasons = [["05-01", "07-31"]]
+daily_budget = 35.0
+cpm = 9.0
+link_ctr = 0.006
+form_completion = 0.035
+
+[[campaigns]]
+key = "meta_retargeting_all"
+display_name = "Retargeting | All Services"
+platform = "meta"
+platform_campaign_id = "120200000000000107"
+tactic = "retargeting"
+utm_campaign = "meta_retargeting_all"
+daily_budget = 20.0
+cpm = 15.0
+link_ctr = 0.018
+need_click_share = 0.25
+landing = "meta_retargeting"
+
+[[campaigns]]
+key = "meta_messaging_general"
+display_name = "Messenger | General"
+platform = "meta"
+platform_campaign_id = "120200000000000108"
+tactic = "messaging"
+utm_campaign = "meta_messaging_general"
+daily_budget = 12.0
+cpm = 9.0
+link_ctr = 0.009
+conversation_to_lead = 0.025
+
+[[campaigns]]
+key = "meta_promo_security"
+display_name = "Promo | Home Security"
+platform = "meta"
+platform_campaign_id = "120200000000000109"
+tactic = "promo"
+utm_campaign = "meta_promo_security"
+service_lines = { security = 1.0 }
+daily_budget = 8.0
+cpm = 10.0
+link_ctr = 0.010
+audience_quality = 0.015
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_prospecting_furnace_ottawa"
+display_name = "Prospecting | Furnace | Ottawa"
+platform = "meta"
+platform_campaign_id = "120200000000000110"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_furnace_ottawa"
+service_lines = { furnace = 1.0 }
+region = "ottawa"
+seasons = [["09-01", "02-28"]]
+daily_budget = 15.0
+cpm = 13.0
+link_ctr = 0.011
+audience_quality = 0.013
+landing = "meta_prospecting"
+
+[[campaigns]]
+key = "meta_prospecting_summer_test"
+display_name = "Prospecting | Summer Test"
+platform = "meta"
+platform_campaign_id = "120200000000000111"
+tactic = "prospecting"
+utm_campaign = "meta_prospecting_summer_test"
+service_lines = { air_conditioner = 0.5, heat_pump = 0.5 }
+start = 2026-06-01
+daily_budget = 20.0
+cpm = 11.0
+link_ctr = 0.011
+audience_quality = 0.016
+landing = "meta_prospecting"
+# Scenario S09: launched without an entry in the team's mapping sheet.
+mapped = false
+
+[[campaigns]]
+key = "search_paid_generic"
+display_name = "Search | Generic"
+platform = "google_ads"
+tactic = "search"
+utm_campaign = "search_generic"
+
+[[campaigns]]
+key = "email_newsletter"
+display_name = "Email | Newsletter"
+platform = "email"
+tactic = "email"
+utm_campaign = "email_newsletter"
+
+# --- planted scenarios -----------------------------------------------------------------
+
+[[demand_events]]
+id = "S03a"
+kind = "cold_snap"
+label = "Cold snap"
+start = 2025-01-20
+end = 2025-01-26
+need_multipliers = { emergency_repair = 3.0, existing_service = 2.0 }
+repair_service_mix = { furnace = 0.85, water_heater = 0.15 }
+
+[[demand_events]]
+id = "S03b"
+kind = "cold_snap"
+label = "Cold snap"
+start = 2026-02-09
+end = 2026-02-14
+need_multipliers = { emergency_repair = 3.0, existing_service = 2.0 }
+repair_service_mix = { furnace = 0.85, water_heater = 0.15 }
+
+[[demand_events]]
+id = "S10"
+kind = "billing_change"
+label = "Billing system change"
+start = 2026-01-12
+end = 2026-01-31
+need_multipliers = { billing = 4.0 }
+
+[[campaign_modifiers]]
+id = "S04"
+label = "Creative fatigue"
+campaign = "meta_prospecting_heatpump"
+start = 2026-03-01
+end = 2026-03-31
+budget = 1.25
+ctr = 0.65
+audience_quality = 0.86
+
+[[page_changes]]
+id = "S05"
+label = "Location pages redesigned"
+date = 2026-05-12
+path_prefix = "/locations/"
+conversion_multiplier = 1.2
+clarity_friction_multiplier = 0.6
+
+[[capture_outages]]
+id = "S06"
+label = "Hidden-field capture broken"
+start = 2026-07-07
+end = 2026-07-16
+
+# --- after the lead --------------------------------------------------------------------
+
+[qualification]
+# P(qualified) = lifecycle.<service>.qualify * intent factor * entry-point and origin multipliers.
+# Intent factor = intent / intent_reference, clipped to intent_factor_range.
+intent_reference = 0.57
+intent_factor_range = [0.5, 1.5]
+by_entry_point = { meta_lead_form = 0.5, web_chat_agent = 0.9, meta_messaging_agent = 0.9 }
+by_origin_channel = { paid_search = 1.2, organic_search = 1.1 }
+# Days from lead creation to the qualify/disqualify decision.
+decision_days = [0.2, 4.0]
+
+# Rates per new-customer lead: qualify (of leads), book (of qualified), complete (of booked),
+# opportunity (of completed consultations, or of qualified without one), win (of closed).
+[lifecycle.furnace]
+qualify = 0.60
+consultation = true
+book = 0.55
+complete = 0.85
+opportunity = 0.90
+win = 0.45
+close_median_days = 21
+amount_median = 5500
+
+[lifecycle.air_conditioner]
+qualify = 0.60
+consultation = true
+book = 0.55
+complete = 0.85
+opportunity = 0.90
+win = 0.45
+close_median_days = 18
+amount_median = 5000
+
+[lifecycle.heat_pump]
+qualify = 0.55
+consultation = true
+book = 0.60
+complete = 0.85
+opportunity = 0.90
+win = 0.35
+close_median_days = 35
+amount_median = 9000
+
+[lifecycle.water_heater]
+qualify = 0.65
+consultation = true
+book = 0.40
+complete = 0.85
+opportunity = 0.90
+win = 0.55
+close_median_days = 10
+amount_median = 2800
+
+[lifecycle.water_treatment]
+qualify = 0.50
+consultation = true
+book = 0.50
+complete = 0.80
+opportunity = 0.85
+win = 0.35
+close_median_days = 25
+amount_median = 3200
+
+[lifecycle.air_quality]
+qualify = 0.50
+consultation = true
+book = 0.35
+complete = 0.80
+opportunity = 0.85
+win = 0.40
+close_median_days = 20
+amount_median = 1500
+
+[lifecycle.security]
+qualify = 0.55
+consultation = false
+opportunity = 1.0
+win = 0.50
+close_median_days = 7
+amount_median = 900
+
+[lifecycle.generator]
+qualify = 0.45
+consultation = true
+book = 0.55
+complete = 0.80
+opportunity = 0.85
+win = 0.30
+close_median_days = 45
+amount_median = 12000
+
+[lifecycle.maintenance_plan]
+qualify = 0.70
+consultation = false
+opportunity = 1.0
+win = 0.60
+close_median_days = 5
+amount_median = 250
+
+[lifecycle_common]
+# Days from lead to close are lognormal around close_median_days with this sigma.
+close_sigma = 0.6
+# Sale price = amount_median * lognormal(0, amount_sigma).
+amount_sigma = 0.35
+amount_basis = { purchase_price = 0.55, financed_total = 0.25, lease_contract = 0.15, monthly = 0.05 }
+financed_markup = 1.15
+lease_months = 120
+# Monthly payment = price / monthly_divisor.
+monthly_divisor = 90
+# Days from booking to the consultation.
+booking_lead_days = [1.0, 10.0]
+# Expected close date recorded on an open opportunity, in days after it was created.
+open_quote_expected_days = 30
+no_show_share_of_incomplete = 0.6
+service_visit_book = 0.85
+service_visit_complete = 0.90
+
+[lifecycle_common.repair_to_replacement]
+min_system_age = 15
+rate = 0.30
+win = 0.45
+close_median_days = 14
+
+# --- what the tracking systems record (applied after the truth is written) -------------
+
+[recording]
+# Hidden form fields that copy UTMs / click ids from the latest tagged visit into the lead.
+utm_capture = 0.85
+# GA client id copied into the lead, among households that accepted analytics cookies.
+ga_id_capture_given_consent = 0.75
+form_page_capture = 0.85
+booking_capture = 0.30
+chat_capture = 0.40
+capture_lookback_days = 30
+meta_id_on_lead_form = 0.90
+meta_id_on_messaging = 0.70
+# Phone leads whose CRM lead source records where the caller heard about the company.
+phone_lead_source_self_reported = 0.50
+lead_source_wrong = 0.10
+request_type_recorded = { web_callback_form = 1.0, phone = 0.85, web_chat_agent = 0.75, meta_messaging_agent = 0.60 }
+existing_customer_recorded = { web_callback_form = 1.0, phone = 0.70 }
+service_line_recorded = { meta_lead_form = 0.90, phone = 0.80, web_chat_agent = 0.60, meta_messaging_agent = 0.50 }
+city_blank = { phone = 0.20, meta_messaging_agent = 0.40, meta_lead_form = 0.10 }
+city_variant = 0.15
+city_unrecognizable = 0.02
+unrecognizable_cities = ["N/A", "Ontario", "asdf", "-", "Canada"]
+qualified_date_recorded = 0.70
+duplicate_within_72h = 0.06
+resubmission_after_72h = 0.01
+test_leads = 0.005
+duplicate_session_rows = 0.005
+
+[clarity]
+bot_session_rate = 0.10
+session_count_noise = 0.05
+dead_click_rate = 0.05
+rage_click_rate = 0.02
+location_rage_click_rate = 0.06
+quickback_rate = 0.04
+excessive_scroll_rate = 0.03
+script_error_rate = 0.01
+scroll_depth_range = [45.0, 70.0]

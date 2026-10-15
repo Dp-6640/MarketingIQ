@@ -11,6 +11,7 @@ credit). Credits sum to exactly 1 per lead, so credit-weighted counts equal plai
 whatever the grouping.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -216,6 +217,7 @@ _SESSION_DIMENSIONS = {
     "platform": "coalesce(c.platform, '(none)')",
     "campaign_tactic": "coalesce(c.tactic, '(none)')",
     "landing_page": "p.path",
+    "landing_page_type": "p.page_type",
 }
 _LEAD_DIMENSIONS = {
     "campaign": "coalesce(cc.key, CASE WHEN a.campaign_value IS NOT NULL THEN '(unmapped)'"
@@ -498,6 +500,8 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
     if any(hidden) or total_hidden:
         warnings.append(warning("small_cell_suppressed"))
 
+    noisy = []
+
     def values_for(base_values, prior_values, hidden_bases) -> dict[str, dict]:
         result = {}
         for name in query.metrics:
@@ -515,6 +519,11 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
                         cell["change"] = cell["value"] - before["value"]
                         if before["value"] != 0:
                             cell["change_pct"] = cell["change"] / before["value"]
+                        if metric.unit == "rate":
+                            significant = _significant(metric, base_values, prior_values)
+                            if significant is not None:
+                                cell["change_significant"] = significant
+                                noisy.append(not significant)
             for field in ("value", "previous", "change"):
                 if cell.get(field) is not None:
                     cell[field] = round_value(cell[field], metric.unit)
@@ -543,6 +552,9 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         if query.flags:
             rows[-1]["flags"] = [name for name in query.flags if key in flag_results[name]["keys"]]
     _rank(rows, query.metrics)
+    totals = values_for(current.totals, prior.totals if prior else None, total_hidden)
+    if any(noisy):
+        warnings.append(warning("change_within_noise"))
     if query.sort_by:
         rows.sort(key=lambda r: (r["values"][query.sort_by].get("value") is None, r["key"]))
         present = [r for r in rows if r["values"][query.sort_by].get("value") is not None]
@@ -576,7 +588,7 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         },
         "rows": rows[: query.limit],
         "row_count": len(rows),
-        "totals": values_for(current.totals, prior.totals if prior else None, total_hidden),
+        "totals": totals,
         **(
             {"flag_rules": {n: f["summary"] for n, f in flag_results.items()}}
             if query.flags
@@ -584,6 +596,24 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         ),
         "warnings": unique_warnings(warnings),
     }
+
+
+Z_95 = 1.96
+
+
+def _significant(metric, now: dict, before: dict) -> bool | None:
+    """Whether a rate's change is larger than chance would produce, by a two-proportion
+    z-test at 95%. None when it can't be tested (empty or degenerate counts). Credit-weighted
+    counts are treated as counts, which is an approximation."""
+    n1, d1 = float(now.get(metric.numerator) or 0), float(now.get(metric.denominator) or 0)
+    n0, d0 = float(before.get(metric.numerator) or 0), float(before.get(metric.denominator) or 0)
+    if d1 <= 0 or d0 <= 0:
+        return None
+    pooled = (n1 + n0) / (d1 + d0)
+    if not 0 < pooled < 1:
+        return None
+    error = math.sqrt(pooled * (1 - pooled) * (1 / d1 + 1 / d0))
+    return abs(n1 / d1 - n0 / d0) / error >= Z_95
 
 
 def _rank(rows: list[dict], metrics: list[str]) -> None:
@@ -663,6 +693,8 @@ WARNING_MESSAGES = {
     "unequal_periods": "The two periods have different lengths.",
     "source_incomplete": "Part of the requested period is before the data starts.",
     "small_cell_suppressed": "Counts under 5 are hidden to protect privacy.",
+    "change_within_noise": "Some rate changes are within what chance alone produces at these "
+    "volumes (95% test); don't read them as real changes.",
     "unmapped_campaigns": "Some campaign traffic or spend can't be linked to a campaign in "
     "the mapping sheet.",
     "capture_drop": "Tracking capture on web forms fell sharply in at least one week; fewer "

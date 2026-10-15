@@ -9,8 +9,9 @@ from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine
 
+from marketingiq.analytics.annotations import AnnotationsQuery, list_annotations
 from marketingiq.analytics.attribution_report import AttributionQuery, compare_attribution_models
 from marketingiq.analytics.change import ChangeQuery, explain_metric_change
 from marketingiq.analytics.dimensions import (
@@ -55,28 +56,16 @@ def dimension_values(
 
 
 @router.get("/annotations")
-def list_annotations(
+def annotations(
     engine: AppEngine,
     org: Org,
     start: date | None = None,
     end: date | None = None,
-    annotation_type: str | None = None,
+    annotation_type: Annotated[str | None, Query(max_length=50)] = None,
 ) -> dict[str, Any]:
     """Dated business events (site changes, demand events, launches) overlapping a range."""
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                "SELECT a.annotation_type, a.start_date, a.end_date, a.label"
-                " FROM core.annotations a JOIN core.organizations o ON o.id = a.org_id"
-                " WHERE o.slug = :org"
-                " AND (CAST(:end AS date) IS NULL OR a.start_date <= :end)"
-                " AND (CAST(:start AS date) IS NULL OR a.end_date >= :start)"
-                " AND (CAST(:kind AS text) IS NULL OR a.annotation_type = :kind)"
-                " ORDER BY a.start_date"
-            ),
-            {"org": org, "start": start, "end": end, "kind": annotation_type},
-        ).mappings()
-        return {"annotations": [dict(row) for row in rows]}
+    query = AnnotationsQuery(start=start, end=end, annotation_type=annotation_type)
+    return list_annotations(engine, org, query)
 
 
 @router.post("/analytics/performance")

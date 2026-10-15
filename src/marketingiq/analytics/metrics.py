@@ -300,6 +300,7 @@ DIMENSION_FAMILIES: dict[str, set[Family]] = {
     "campaign_tactic": {"spend", "sessions", "leads"},
     "evidence_tier": {"leads"},
     "landing_page": {"sessions"},
+    "landing_page_type": {"sessions"},
     **{dimension: {"leads"} for dimension in LEAD_DIMENSIONS},
 }
 Dimension = Literal[
@@ -309,6 +310,7 @@ Dimension = Literal[
     "campaign_tactic",
     "evidence_tier",
     "landing_page",
+    "landing_page_type",
     "entry_point",
     "service_line",
     "region",

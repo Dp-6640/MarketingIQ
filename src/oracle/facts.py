@@ -50,6 +50,7 @@ class Session:
     campaign: str | None
     unmapped: bool  # a campaign value the mapping sheet doesn't know
     landing_page: str
+    page_type: str
     form_submit: bool
 
 
@@ -177,6 +178,23 @@ def channel_of(source: str, medium: str, rules: dict) -> str:
     return "other"
 
 
+def page_type(path: str, site: dict) -> str:
+    """The rule book's page map: exact pages first, then the path prefixes."""
+    for kind in ("home", "quote", "careers"):
+        if path in site[kind]:
+            return kind
+    if path in site["service_pages"]:
+        return "service"
+    for kind, prefix in (
+        ("blog", "blog_prefix"),
+        ("location", "location_prefix"),
+        ("offer", "offer_prefix"),
+    ):
+        if path.startswith(site[prefix]):
+            return kind
+    return "other"
+
+
 # --- leads --------------------------------------------------------------------------------
 
 
@@ -284,6 +302,7 @@ def load(folder: Path | str, rules_path: Path = RULES) -> Facts:
                 campaign=campaign.key if campaign else None,
                 unmapped=tagged and campaign is None,
                 landing_page=row["landing_page"],
+                page_type=page_type(row["landing_page"], rules["site"]),
                 form_submit=int(row["ev_quote_submit"] or 0) + int(row["ev_callback_submit"] or 0)
                 > 0,
             )

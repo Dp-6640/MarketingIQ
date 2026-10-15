@@ -42,6 +42,14 @@ Every request takes an optional `?org=<slug>`. Without it, the API uses `DEFAULT
 - `warnings`: caveat codes with plain-English messages (see `docs/metrics.md`).
 - In performance rows, every shown value has a `rank` (1 = largest, ties share a rank) and `rank_of` (how many rows have a value). Ranks cover all rows, before `limit`, so "third of eight" can be stated without counting.
 
+## Is a change real?
+
+A compared rate carries `change_significant`: whether the change is beyond what chance produces at those volumes (two-proportion test, 95%). If any shown rate change isn't, the result carries `change_within_noise`. Example: location pages' form submit rate moved +21% in the 60 days after the May 2026 redesign, on about 830 sessions, and that's within noise. The assistant reports "no detectable change", not "up 21%".
+
+## The tools
+
+`src/marketingiq/tools.py` registers the assistant's eight tools: name, a description written for the model, the input model and the service. The REST endpoints call the same services. No tool accepts SQL or free text to execute.
+
 ## Flags: selections the tool makes
 
 Some questions ask which rows meet a condition ("campaigns with cheap leads that rarely qualify"). The selection is a deterministic rule in the tool, never a comparison the LLM makes. A performance query takes `flags`; each flagged row lists it, and `flag_rules` states the rule, how many rows were judged, the medians used and how many were flagged.

@@ -21,6 +21,7 @@ ResolvableDimension = Literal[
     "campaign_tactic",
     "channel",
     "landing_page",
+    "landing_page_type",
     "evidence_tier",
     "entry_point",
     "service_line",
@@ -93,6 +94,8 @@ def _values(conn, ctx, dimension: str) -> list[dict[str, Any]]:
         return [dict(r) for r in rows]
     if dimension == "channel":
         return [{"value": v, "label": v} for v in vocab.REPORTED_CHANNELS]
+    if dimension == "landing_page_type":
+        return [{"value": v, "label": v} for v in vocab.PAGE_TYPES]
     if dimension == "evidence_tier":
         return [{"value": v, "label": v} for v in vocab.EVIDENCE_TIERS]
     if dimension == "region":

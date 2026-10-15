@@ -145,7 +145,15 @@ def test_ad_platform_measures(world, group_by):
 
 @pytest.mark.parametrize(
     "group_by",
-    [(), ("campaign",), ("channel",), ("platform",), ("landing_page",), ("campaign_tactic",)],
+    [
+        (),
+        ("campaign",),
+        ("channel",),
+        ("platform",),
+        ("landing_page",),
+        ("landing_page_type",),
+        ("campaign_tactic",),
+    ],
 )
 def test_sessions(world, group_by):
     engine, facts = world

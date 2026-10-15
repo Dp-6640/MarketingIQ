@@ -59,6 +59,27 @@ def _property(lead: Lead, dimension: str) -> str | None:
     return getattr(lead, dimension)
 
 
+# Filters as the API takes them: attributed ones select credit, lead ones select leads.
+CREDIT_FILTERS = {"campaigns": "campaign", "channels": "channel", "platforms": "platform"}
+LEAD_FILTERS = {"service_lines": "service_line", "regions": "region", "entry_points": "entry_point"}
+
+
+def _keeps_credit(facts: Facts, credit: Credit, filters: dict) -> bool:
+    return all(
+        _attributed(facts, credit, dimension) in filters[name]
+        for name, dimension in CREDIT_FILTERS.items()
+        if filters.get(name)
+    )
+
+
+def _keeps_lead(lead: Lead, filters: dict) -> bool:
+    return all(
+        getattr(lead, field) in filters[name]
+        for name, field in LEAD_FILTERS.items()
+        if filters.get(name)
+    )
+
+
 def campaigns_with_spend(facts: Facts) -> set[str]:
     return {row["campaign"] for row in facts.spend_rows}
 
@@ -73,6 +94,7 @@ def leads(
     model: str = "last_non_direct",
     lookback: int = 30,
     paid: bool = False,
+    filters: dict | None = None,
 ) -> dict[tuple, Fraction]:
     """Credit-weighted lead counts. `paid` keeps only credit given to campaigns with spend.
 
@@ -87,11 +109,14 @@ def leads(
         keep = LEAD_BASES[base]
     with_spend = campaigns_with_spend(facts) if paid else set()
     totals: dict[tuple, Fraction] = defaultdict(Fraction)
+    filters = filters or {}
     for lead in _population(facts, start, end, population):
-        if not keep(lead):
+        if not keep(lead) or not _keeps_lead(lead, filters):
             continue
         for credit in lead.credits[(model, lookback)]:
             if paid and credit.campaign not in with_spend:
+                continue
+            if not _keeps_credit(facts, credit, filters):
                 continue
             key = tuple(
                 _attributed(facts, credit, d) if d in ATTRIBUTED else _property(lead, d)
@@ -102,13 +127,20 @@ def leads(
 
 
 def ad_measure(
-    facts: Facts, start: date, end: date, measure: str = "spend", group_by: tuple[str, ...] = ()
+    facts: Facts,
+    start: date,
+    end: date,
+    measure: str = "spend",
+    group_by: tuple[str, ...] = (),
+    filters: dict | None = None,
 ) -> dict[tuple, Decimal | int]:
     """Meta insights (spend, impressions, link_clicks, platform_reported_leads), by account day."""
     totals: dict[tuple, Decimal | int] = defaultdict(int)
     for row in facts.spend_rows:
         if start <= row["day"] <= end:
             credit = Credit(row["campaign"], facts.campaigns[row["campaign"]].channel, Fraction(1))
+            if not _keeps_credit(facts, credit, filters or {}):
+                continue
             key = tuple(_attributed(facts, credit, d) for d in group_by)
             totals[key] += row[measure]
     return dict(totals)
@@ -123,7 +155,11 @@ def sessions(
             continue
         credit = Credit(session.campaign, session.channel, Fraction(1), session.unmapped)
         key = tuple(
-            session.landing_page if d == "landing_page" else _attributed(facts, credit, d)
+            session.landing_page
+            if d == "landing_page"
+            else session.page_type
+            if d == "landing_page_type"
+            else _attributed(facts, credit, d)
             for d in group_by
         )
         totals[key] += 1

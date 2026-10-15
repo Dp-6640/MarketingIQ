@@ -65,7 +65,7 @@ Implemented once, in [`src/marketingiq/analytics/metrics.py`](../src/marketingiq
 ## Dimensions: lead properties vs attributed
 
 - **Lead-property dimensions** (`entry_point`, `service_line`, `region`, `lead_class`, `customer_type`, `lead_month`) are facts recorded on the lead. Grouping by them counts leads directly and does **not** depend on an attribution model.
-- **Attributed dimensions** (`campaign`, `channel`, `platform`, `campaign_tactic`, `landing_page`) need an attribution model, lookback and coverage, because a lead can only be assigned to them through attribution credit.
+- **Attributed dimensions** (`campaign`, `channel`, `platform`, `campaign_tactic`, `landing_page`, `landing_page_type`) need an attribution model, lookback and coverage, because a lead can only be assigned to them through attribution credit.
 - A grouping may combine at most two dimensions in the MVP (e.g. service line × region).
 
 ## Small-cell suppression
@@ -83,7 +83,9 @@ Every analytical result should include `resolved` context (period, comparison pe
 
 ## Caveat codes expected by the MVP
 
-`population_default`, `low_attribution_coverage`, `no_spend_source`, `amount_basis_unverified`, `mapping_unverified`, `seasonal_comparison`, `immature_cohort`, `maturity_unknown`, `small_cell_suppressed`, `timezone_mismatch`, `synthetic_data`, `source_incomplete`, `classification_default_applied`, `unequal_periods`, `spend_not_by_dimension`, `amount_basis_mixed`.
+`population_default`, `low_attribution_coverage`, `no_spend_source`, `amount_basis_unverified`, `mapping_unverified`, `seasonal_comparison`, `immature_cohort`, `maturity_unknown`, `small_cell_suppressed`, `timezone_mismatch`, `synthetic_data`, `source_incomplete`, `classification_default_applied`, `unequal_periods`, `spend_not_by_dimension`, `amount_basis_mixed`, `change_within_noise`.
+
+**Is a rate change real?** When a rate (qualification rate, form submit rate, CTR...) is compared between periods, the cell carries `change_significant`: whether the change is larger than chance would produce, by a two-proportion test at 95%. Any shown rate change that isn't significant adds `change_within_noise`. Credit-weighted counts are treated as counts, which is an approximation.
 
 ## Why a value is missing
 

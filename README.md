@@ -13,12 +13,14 @@ MarketingIQ is a proposed **internal, read-only marketing intelligence assistant
 
 ## What this first pack contains
 
+- `docs/build-journal.md` — the learning journal: every step, what was built, why, concepts and interview angles. Start here.
 - `docs/scope.md` — product goal, intended users, MVP boundaries and canonical questions.
 - `docs/metrics.md` — metric definitions and reporting rules.
 - `docs/lifecycle_and_classification.md` — lead lifecycle and deterministic lead classification.
 - `docs/attribution.md` — attribution evidence tiers and model rules.
 - `docs/synthetic-data.md` — generator assumptions, planted scenarios and output files (all values synthetic).
 - `docs/loading.md` — how files load into staging, and the loader's error codes.
+- `docs/analytics-api.md` — the analytics services, the REST endpoints and what each report answers.
 - `docs/core-model.md` — how the core model is built, the rule book, results and known limitations.
 - `docs/question-tool-map.md` — each canonical question mapped to tools, metrics and expected caveats; seed for the benchmark.
 - `docs/source-to-canonical.md` — proposed source mappings and data flow.

@@ -34,16 +34,17 @@ flowchart LR
     staging --> core["Core model<br/>canonical tables"]:::built
     core --> mart["Mart<br/>attribution credits"]:::built
     mart --> analytics["Analytics<br/>metrics and reports"]:::built
-    analytics --> api["API and tools<br/>typed, read-only"]:::next
+    analytics --> api["API and tools<br/>typed, read-only"]:::built
     oracle["Oracle<br/>second implementation"]:::built -.->|checks| analytics
     files -.-> oracle
-    api --> llm["LLM answer<br/>numbers filled in"]:::planned
+    api --> llm["LLM answer<br/>numbers filled in"]:::next
+    bench["Benchmark<br/>32 cases, answer key"]:::built -.->|judges| llm
     classDef built fill:#dbeafe,stroke:#2563eb,stroke-width:2px
     classDef next fill:#fff,stroke:#2563eb,stroke-width:2px,stroke-dasharray:5 4
     classDef planned fill:#fff,stroke:#9ca3af
 ```
 
-Numbers flow from files to answers; the LLM never computes them. Filled boxes exist today, the dashed box is in progress (the REST API is built; the assistant's tools come in Phase 4), and the grey box is planned. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
+Numbers flow from files to answers; the LLM never computes them. Filled boxes exist today; the dashed box is next (Phase 4, the assistant). The benchmark was written first, so it can judge the assistant without being shaped by it. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
 
 ### Progress log
 
@@ -51,6 +52,11 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-10-15 | `9c34f15` | Benchmark: 32 cases with an answer key checked by the oracle |
+| 2026-10-15 | `7adc63f` | Tool registry, landing-page type, and a noise check on rate changes |
+| 2026-10-15 | `d8476ad` | Model comparison and dimension lookup |
+| 2026-10-15 | `42a4fa0` | Ranks and the question-6 flag in performance results |
+| 2026-10-15 | `a8d03a3` | Journal: step 10, the oracle |
 | 2026-10-15 | `cc0fa69` | Oracle: an independent second implementation, checked cell by cell |
 | 2026-10-15 | `995b15c` | Click-ID-only credit goes to (unmapped), as attribution.md says |
 | 2026-10-15 | `7ce92ab` | Build journal moves into the repo |
@@ -350,6 +356,35 @@ After the fixes, the two implementations agree everywhere: 26 tests on the tiny 
 
 **Interview line:** "I wrote a second, independent implementation from the spec, not the code, and compared it with the app cell by cell. It found a real attribution bug and two rules the spec had never written down. Now both agree on every number, so my evaluation benchmark has a trustworthy answer key."
 
+## Step 11: the last tools, and the benchmark (Phase 3 complete)
+
+**What we built** (`42a4fa0` ranks and flags, `d8476ad` model comparison and lookup, `7adc63f` tool registry and noise check, `9c34f15` benchmark):
+
+- **The tools the questions need:** per-row ranks, a flag for "cheap leads that rarely qualify", `compare_attribution_models`, `list_dimension_values` (finds "the furnace campaign", or a region by city, and says when several match), and a `landing_page_type` dimension.
+- **A tool registry** (`src/marketingiq/tools.py`): eight typed, read-only tools, each with a description written for the LLM, an input model and the same service the REST API calls.
+- **A noise check:** every compared rate says whether its change is larger than chance would produce.
+- **The benchmark:** 32 cases in `src/benchmark/cases.toml`. `python -m benchmark check` runs each case's reference tool calls and checks the caveats, the scenario expectations and 663 numbers against the oracle. The answer key goes to `benchmark/reference-report.md`. Reference: `docs/benchmark.md`.
+
+**Why:**
+
+- **The LLM never compares numbers itself.** Ranks, flags, direction labels and significance are computed by the tools. "Third of eight", "flagged", "within noise": the model repeats them, it doesn't work them out. Language models are unreliable at exactly this kind of arithmetic.
+- **Ambiguity is a result, not a guess.** The lookup returns `match: several`, so the assistant asks "which furnace campaign?" instead of picking one.
+- **The benchmark comes before the LLM.** If the assistant were built first, its behaviour would quietly shape what counts as correct. Writing the answer key first, and checking it with an independent oracle, means "correct" is fixed in advance.
+- **A case states the right *kind* of response.** Answer, clarify, abstain or refuse. Refusing person-level data, or abstaining when no spend feed exists, is a correct answer, and it gets scored.
+
+**What writing the answer key revealed:** four cases where the honest answer differed from what was planned.
+
+| Case | Finding |
+|---|---|
+| Q06 | The Phase 0 rule for "cheap leads, expensive qualified leads" never fired: costs per lead and per qualified lead rise together. The rule now compares qualification rates and picks out exactly the planted promos. |
+| Q19 | The planted +20% form-submit rate after the location-page redesign is noise at about 420 sessions a month. Without the new significance check, an assistant would have reported "+21%" or "−6%" depending on the window chosen. The right answer is "no detectable change". |
+| Q18 | The heat-pump campaign gets almost no lead credit at all, so its planted quality drop is invisible in attributed numbers; prospecting rarely gets last-touch credit. The honest answer is that no visible campaign matches. |
+| Q04 | My own expectation was wrong: filtered to Meta, attribution coverage is high, so no low-coverage warning is due. |
+
+**Concepts:** answer key, statistical significance and the two-proportion test, sample size and statistical power, entity resolution, abstention vs refusal, deterministic selection rules.
+
+**Interview line:** "Before writing any LLM code, I wrote 32 benchmark cases with an answer key verified by an independent implementation. Writing them caught a business rule that could never fire and a planted effect too small to detect. So I added a significance check, and the assistant says 'no detectable change' instead of reporting noise."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -400,6 +435,12 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | Test oracle | An independent way to know the right answer, used to judge the system under test | src/oracle/, docs/oracle.md |
 | N-version checking | Building the same thing twice from the spec, so the copies' disagreements reveal bugs | The oracle vs the app |
 | Exact fractions | Numbers like 1/3 kept exactly instead of rounded, so totals add up with no error | The oracle's credits |
+| Answer key | The correct result for each benchmark question, fixed before the system being judged exists | benchmark/reference-report.md |
+| Statistical significance | Whether a difference is bigger than chance alone would produce at that sample size | change_significant |
+| Two-proportion test | The standard test for whether two rates (19 of 418 vs 18 of 421) really differ | Rate comparisons |
+| Statistical power | Whether there's enough data to detect an effect of a given size at all | Scenario S05 |
+| Entity resolution | Turning the words a person used into an exact value ("the furnace campaign" → a campaign key) | list_dimension_values |
+| Abstain vs refuse | Abstain: the data can't give this number, say why. Refuse: the request is out of scope by design. | Benchmark kinds |
 
 ## Interview talking points
 
@@ -427,3 +468,4 @@ These questions involve no company data, only how the systems are set up. Each a
 - [ ] Can the project use the company's name, or be shown publicly? Check your employment agreement and ask your manager. (U-23)
 - [ ] Is there a separate form for nominations, or do they come through the quote form? (U-20; they currently count as acquisition leads)
 - [ ] How many leads a month does each campaign really get? That decides whether hiding counts under 5 leaves useful campaign-level answers (U-15)
+- [ ] Does the performance marketing manager agree with the rule for "cheap leads that rarely qualify": cost per lead and qualification rate both below the median, among campaigns with at least 10 leads? (question 6)

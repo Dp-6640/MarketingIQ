@@ -21,6 +21,7 @@ MarketingIQ is a proposed **internal, read-only marketing intelligence assistant
 - `docs/synthetic-data.md` — generator assumptions, planted scenarios and output files (all values synthetic).
 - `docs/loading.md` — how files load into staging, and the loader's error codes.
 - `docs/analytics-api.md` — the analytics services, the REST endpoints and what each report answers.
+- `docs/assistant.md` — the assistant: setup with a free model, how a run works, numbers by reference.
 - `docs/oracle.md` — the independent second implementation that checks every number, and what it found.
 - `docs/benchmark.md` — the 32 benchmark cases, the reference run and what writing them revealed.
 - `docs/core-model.md` — how the core model is built, the rule book, results and known limitations.

@@ -1,6 +1,5 @@
 """Benchmark cases: loading, validation, and the small path language they use."""
 
-import re
 import tomllib
 from pathlib import Path
 from typing import Any, Literal
@@ -8,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from marketingiq.analytics.performance import WARNING_MESSAGES
+from marketingiq.assistant.paths import walk
 from marketingiq.tools import TOOLS
 
 CASES = Path(__file__).with_name("cases.toml")
@@ -77,18 +77,8 @@ def load_cases(path: Path = CASES) -> list[Case]:
 
 # --- paths ------------------------------------------------------------------------------------
 #
-# "<call index>:<steps>", steps separated by dots. A step is a key, optionally followed by
-# [n] (list index, negative from the end) or {field=value} (the first list item whose field
-# equals value; true/false/numbers are compared as text). Example:
+# "<call index>:<path>", the path in the language of marketingiq.assistant.paths. Example:
 #   1:rows{key=meta_prospecting_furnace}.values.cost_per_lead.value
-
-_STEP = re.compile(
-    r"^(?P<name>[^\[{]+)?(?:\[(?P<index>-?\d+)\]|\{(?P<field>[^=}]+)=(?P<want>[^}]*)\})?$"
-)
-
-
-class Missing(LookupError):
-    pass
 
 
 def split_path(path: str) -> tuple[int, str]:
@@ -98,33 +88,4 @@ def split_path(path: str) -> tuple[int, str]:
 
 def resolve(path: str, results: list[dict]) -> Any:
     index, rest = split_path(path)
-    node: Any = results[index]
-    for step in rest.split("."):
-        match = _STEP.match(step)
-        if not match:
-            raise ValueError(f"bad path step {step!r}")
-        if match["name"]:
-            if not isinstance(node, dict) or match["name"] not in node:
-                raise Missing(f"{path}: no {match['name']!r}")
-            node = node[match["name"]]
-        if match["index"] is not None:
-            try:
-                node = node[int(match["index"])]
-            except (IndexError, TypeError, KeyError):
-                raise Missing(f"{path}: no item {match['index']}") from None
-        elif match["field"] is not None:
-            found = [
-                item
-                for item in node
-                if isinstance(item, dict) and _text(item.get(match["field"])) == match["want"]
-            ]
-            if not found:
-                raise Missing(f"{path}: no item with {match['field']}={match['want']}")
-            node = found[0]
-    return node
-
-
-def _text(value: Any) -> str:
-    if isinstance(value, bool):
-        return str(value).lower()
-    return str(value)
+    return walk(results[index], rest)

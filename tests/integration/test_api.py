@@ -4,6 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from marketingiq.api.app import app
+from marketingiq.api.routes_assistant import chat_model
+from marketingiq.assistant.llm import ModelNotConfigured, Reply, ScriptedModel, call
 from marketingiq.core.build import build_core
 from marketingiq.db import get_app_engine
 from marketingiq.ingest.loader import load_dataset
@@ -99,3 +101,40 @@ def test_unknown_organization_is_404(client):
 
     assert response.status_code == 404
     assert "nobody" in response.json()["detail"]
+
+
+def test_the_assistant_answers_through_the_api(client):
+    script = ScriptedModel(
+        [
+            Reply(None, [call("get_performance", {"period": QUARTER, "metrics": ["leads"]})]),
+            Reply(
+                None,
+                [
+                    call(
+                        "submit_answer",
+                        {"status": "answered", "answer": "{{c1:totals.leads}} leads."},
+                    )
+                ],
+            ),
+        ]
+    )
+    app.dependency_overrides[chat_model] = lambda: script
+    try:
+        response = client.post("/api/v1/assistant/ask", json={"question": "How many leads?"})
+    finally:
+        del app.dependency_overrides[chat_model]
+
+    body = response.json()
+    assert response.status_code == 200 and body["status"] == "answered"
+    assert body["citations"][0]["path"] == "totals.leads"
+    assert body["calls"][0]["tool"] == "get_performance"
+
+
+def test_the_assistant_says_when_no_model_is_configured(client, monkeypatch):
+    def unconfigured():
+        raise ModelNotConfigured("LLM_API_KEY is not set.")
+
+    monkeypatch.setattr("marketingiq.api.routes_assistant.get_chat_model", unconfigured)
+    response = client.post("/api/v1/assistant/ask", json={"question": "How many leads?"})
+
+    assert response.status_code == 503 and "LLM_API_KEY" in response.json()["detail"]

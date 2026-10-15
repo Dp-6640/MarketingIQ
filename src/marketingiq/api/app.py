@@ -11,12 +11,14 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from marketingiq import __version__
 from marketingiq.api.routes_analytics import router as analytics_router
+from marketingiq.api.routes_assistant import router as assistant_router
 from marketingiq.db import get_app_engine
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MarketingIQ", version=__version__)
 app.include_router(analytics_router)
+app.include_router(assistant_router)
 
 
 @app.exception_handler(LookupError)

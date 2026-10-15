@@ -4,9 +4,10 @@ import re
 
 import pytest
 
-from benchmark.cases import Missing, load_cases, resolve
+from benchmark.cases import load_cases, resolve
 from marketingiq.analytics.metrics import METRICS
 from marketingiq.analytics.performance import _significant
+from marketingiq.assistant.paths import Missing
 
 RESULTS = [
     {

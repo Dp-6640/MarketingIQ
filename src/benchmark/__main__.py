@@ -17,8 +17,9 @@ from typing import Any
 
 from sqlalchemy import text
 
-from benchmark.cases import Case, Missing, load_cases, resolve
+from benchmark.cases import Case, load_cases, resolve
 from benchmark.verify import check_result
+from marketingiq.assistant.paths import Missing
 from marketingiq.db import get_app_engine
 from marketingiq.tools import call_tool
 from oracle import load

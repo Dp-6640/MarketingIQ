@@ -35,13 +35,15 @@ flowchart LR
     core --> mart["Mart<br/>attribution credits"]:::built
     mart --> analytics["Analytics<br/>metrics and reports"]:::built
     analytics --> api["API and tools<br/>typed, read-only"]:::next
+    oracle["Oracle<br/>second implementation"]:::built -.->|checks| analytics
+    files -.-> oracle
     api --> llm["LLM answer<br/>numbers filled in"]:::planned
     classDef built fill:#dbeafe,stroke:#2563eb,stroke-width:2px
     classDef next fill:#fff,stroke:#2563eb,stroke-width:2px,stroke-dasharray:5 4
     classDef planned fill:#fff,stroke:#9ca3af
 ```
 
-Numbers flow from files to answers; the LLM never computes them. Filled boxes exist today, the dashed box is in progress (the REST API is built; the assistant's tools come in Phase 4), and the grey box is planned. Ground truth never enters the database: it goes straight to the tests.
+Numbers flow from files to answers; the LLM never computes them. Filled boxes exist today, the dashed box is in progress (the REST API is built; the assistant's tools come in Phase 4), and the grey box is planned. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
 
 ### Progress log
 
@@ -49,6 +51,9 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-10-15 | `cc0fa69` | Oracle: an independent second implementation, checked cell by cell |
+| 2026-10-15 | `995b15c` | Click-ID-only credit goes to (unmapped), as attribution.md says |
+| 2026-10-15 | `7ce92ab` | Build journal moves into the repo |
 | 2026-10-15 | `5e8aa57` | REST API for the analytics services |
 | 2026-10-15 | `2bc1a56` | Change explanation: segment contributions to a metric's change |
 | 2026-10-15 | `c20396f` | Data-quality report |
@@ -316,6 +321,35 @@ Mapping all 25 business questions to tools exposed gaps the prose had hidden: fi
 
 **Interview line:** "The API, the assistant's tools and the tests all call the same service functions with the same typed query models. Invalid questions are rejected by validation before any SQL runs, and every answer echoes the exact dates and caveats it covers."
 
+## Step 10: the oracle (Phase 3 begins)
+
+**What we built** (`cc0fa69` oracle, `995b15c` the bug it found): `src/oracle/`, a second implementation of MarketingIQ's numbers. It reads the dataset's CSV files directly, with no database and no imports from the app, and it was written from the documents, not from the app's code. A test compares the two cell by cell. Reference: `docs/oracle.md`.
+
+**Why:**
+
+- **A system can't check itself.** Tests written by the same person who wrote the code share that person's assumptions. A second implementation built from the *spec* fails exactly where the code and the spec disagree. This is called *N-version* checking, or a *test oracle*.
+- **It's written in a deliberately different style.** The app uses SQL over tables and stores decimals; the oracle uses one plain loop per lead and exact fractions. Shared bugs are less likely when the code shares nothing.
+- **Only the rule book is shared.** It is configuration (which page means which service line), and two copies would only drift apart. A wrong rule would be wrong in both, which is why the rules are still marked unverified.
+- **It compares raw numbers, before rounding and privacy suppression.** That way even a tiny test world can be checked cell by cell. Rounding and suppression have their own tests.
+- **It comes before the LLM.** Phase 4's benchmark will ask "did the assistant get the right number?", and "right" needs a source that isn't the system under test.
+
+**What it found:**
+
+| Finding | Who was wrong |
+|---|---|
+| 272 leads with only a Google click ID were credited to "(no campaign)"; `attribution.md` says "(unmapped)", because the click points at a campaign nobody can name | The app: fixed in `995b15c`, with a unit test |
+| Offer pages (`/offers/heat-pump/`) give a service line | The docs didn't say so: `core-model.md` now does |
+| "Vaughan ON" and "Toronto, Ontario" lose the province before matching | The docs only said "cleaned spelling": now spelled out |
+| Exact duplicate GA4 rows | The oracle's first draft: the loader drops them, as documented |
+
+After the fixes, the two implementations agree everywhere: 26 tests on the tiny world, and 640 comparisons over one year of the full dataset (every lead measure by every dimension, model and lookback, plus sessions and ad spend).
+
+**What's next in Phase 3:** close the three tool gaps the question map exposes (`compare_attribution_models`, per-row ranks for the "cheap leads, expensive qualified leads" question, and `list_dimension_values`). Then write the benchmark: every canonical question plus the refusal and safety cases, each with expected tool calls, caveats and oracle values.
+
+**Concepts:** test oracle, N-version checking, specification vs implementation, exact arithmetic with fractions, comparing before presentation layers (rounding, suppression).
+
+**Interview line:** "I wrote a second, independent implementation from the spec, not the code, and compared it with the app cell by cell. It found a real attribution bug and two rules the spec had never written down. Now both agree on every number, so my evaluation benchmark has a trustworthy answer key."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -363,6 +397,9 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | Contribution to change | How much of a total's change one segment accounts for; arithmetic, not a cause | share_of_change |
 | Capture rate | The share of web form leads whose hidden fields recorded a campaign; a sudden drop means broken tracking | Data-quality report, scenario S06 |
 | 422 / 404 | HTTP status codes: the request is invalid / the thing asked about doesn't exist | The REST API |
+| Test oracle | An independent way to know the right answer, used to judge the system under test | src/oracle/, docs/oracle.md |
+| N-version checking | Building the same thing twice from the spec, so the copies' disagreements reveal bugs | The oracle vs the app |
+| Exact fractions | Numbers like 1/3 kept exactly instead of rounded, so totals add up with no error | The oracle's credits |
 
 ## Interview talking points
 

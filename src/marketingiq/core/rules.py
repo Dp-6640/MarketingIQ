@@ -135,6 +135,13 @@ class Classification(Section):
 
 class Attribution(Section):
     lookback_days: int = Field(ge=1, le=365)
+    supported_lookback_days: list[int] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _default_is_supported(self) -> "Attribution":
+        if self.lookback_days not in self.supported_lookback_days:
+            raise ValueError("lookback_days must be one of supported_lookback_days")
+        return self
 
 
 class RuleBook(BaseModel):
@@ -370,15 +377,21 @@ class Rules:
             return "acquisition", None
         return "unknown", None
 
-    def evidence(self, lead: EvidenceInput, journey: Sequence[datetime]) -> Evidence:
+    def evidence(
+        self,
+        lead: EvidenceInput,
+        journey: Sequence[datetime],
+        lookback: timedelta | None = None,
+    ) -> Evidence:
         """Evidence tier, first match wins (docs/attribution.md). `journey` = the sorted
-        start times of every GA4 session of the lead's GA client id."""
+        start times of every GA4 session of the lead's GA client id; `lookback` defaults to
+        the rule book's."""
         detail = None
         if lead.ga_client_id:
             if not journey:
                 detail = "ga_id_unmatched"
             else:
-                first = bisect_left(journey, lead.created_at - self.lookback)
+                first = bisect_left(journey, lead.created_at - (lookback or self.lookback))
                 if first < len(journey) and journey[first] <= lead.created_at:
                     return Evidence("T1_journey")
                 detail = "journey_outside_lookback"

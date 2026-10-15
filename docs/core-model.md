@@ -31,6 +31,7 @@ Every cleaning rule lives in [`src/marketingiq/core/rules.toml`](../src/marketin
 | `core.opportunities` | Opportunity, linked to the lead converted into it | Salesforce opportunities |
 | `core.annotations` | Dated business event | Annotations file |
 | `core.build_runs` | Build | The build itself |
+| `mart.lead_attribution_credits` | Credited touch of a first lead, per model and lookback window | Leads + sessions, with `src/marketingiq/mart/attribution.py` |
 
 ## What happens to a lead
 
@@ -45,6 +46,7 @@ In this order (each step is a function in `rules.py` with its own tests):
 7. **Duplicates**: the same person within 72 hours of their first lead. Only the first lead counts.
 8. **Class**: the ordered rules in `docs/lifecycle_and_classification.md`.
 9. **Evidence tier** (first leads only): T1 journey → T3 platform-native → T2 captured source → T4 self-reported channel → T5 none, as in `docs/attribution.md`.
+10. **Attribution credits** (first leads only), for every model (first touch, last non-direct, linear) and every supported lookback window (7, 30 and 90 days). Credits are exact decimals that sum to exactly 1 per lead, so credited totals always equal lead counts.
 
 ## Results on the default synthetic dataset
 
@@ -57,7 +59,13 @@ In this order (each step is a function in `rules.py` with its own tests):
 | Cities: exact or cleaned / alias / region only / blank / unrecognized | 11,477 / 112 / 17 / 1,445 / 212 |
 | Unmapped campaign values in GA4 | `meta_prospecting_summer_test`, 2,124 sessions (scenario S09) |
 | Appointments or opportunities without a lead | 0 |
-| Build time | about 18 seconds |
+| Attribution credit rows | about 127,000 (12,587 first leads × 3 models × 3 windows, plus extra rows for linear splits) |
+| Build time | about 40 seconds |
+
+## Performance notes
+
+- **Every foreign key a rebuild deletes through has an index.** Without one on `mart.lead_attribution_credits.session_id`, deleting 138,000 sessions made Postgres scan the whole credits table once per session: a rebuild ran for over five minutes before being cancelled. A test now fails if any foreign key lacks a supporting index.
+- **Most of a build is the database enforcing integrity.** Profiling a build: about 18 of its 26 writing seconds are Postgres checking foreign keys and updating indexes while `COPY` streams about 290,000 rows. That's acceptable for a prototype. At real-data volumes the options are an incremental mart, or building into new tables and swapping them in.
 
 ## Known limitations
 

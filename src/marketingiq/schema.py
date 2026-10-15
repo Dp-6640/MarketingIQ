@@ -2,8 +2,9 @@
 
 from marketingiq.core import tables as core_tables
 from marketingiq.ingest.staging import STAGING_TABLES
+from marketingiq.mart import tables as mart_tables
 from marketingiq.models import SCHEMAS, Base
 
 metadata = Base.metadata
 
-__all__ = ["SCHEMAS", "STAGING_TABLES", "core_tables", "metadata"]
+__all__ = ["SCHEMAS", "STAGING_TABLES", "core_tables", "mart_tables", "metadata"]

@@ -283,3 +283,70 @@ def test_the_app_role_can_read_the_core_model(built):
 
     assert scalar(engine, "SELECT has_table_privilege('miq_app', 'core.leads', 'SELECT')")
     assert not scalar(engine, "SELECT has_table_privilege('miq_app', 'core.leads', 'DELETE')")
+
+
+def test_attribution_credits_reconcile_with_lead_counts_exactly(built):
+    engine, _, _ = built
+    first_leads = scalar(engine, "SELECT count(*) FROM core.leads WHERE duplicate_of IS NULL")
+
+    totals = rows(
+        engine,
+        "SELECT model, lookback_days, sum(credit) FROM mart.lead_attribution_credits GROUP BY 1, 2",
+    )
+    assert len(totals) == 9  # 3 models x 3 lookback windows
+    assert all(total == first_leads for _, _, total in totals)
+    assert (
+        scalar(
+            engine,
+            "SELECT count(*) FROM (SELECT lead_id FROM mart.lead_attribution_credits"
+            " GROUP BY lead_id, model, lookback_days HAVING sum(credit) <> 1) AS wrong",
+        )
+        == 0
+    )
+
+
+def test_no_credit_goes_to_a_visit_after_the_lead(built):
+    engine, _, _ = built
+
+    assert (
+        scalar(
+            engine,
+            "SELECT count(*) FROM mart.lead_attribution_credits c"
+            " JOIN core.web_sessions s ON s.id = c.session_id"
+            " JOIN core.leads l ON l.id = c.lead_id WHERE s.started_at > l.created_at",
+        )
+        == 0
+    )
+
+
+def test_single_touch_tiers_are_the_same_under_every_model(built):
+    engine, _, _ = built
+
+    differing = scalar(
+        engine,
+        "SELECT count(*) FROM (SELECT lead_id, lookback_days FROM mart.lead_attribution_credits"
+        " WHERE evidence_tier <> 'T1_journey' GROUP BY lead_id, lookback_days"
+        " HAVING count(DISTINCT (coalesce(campaign_id, -1), coalesce(channel, '')))"
+        " > 1) AS differing",
+    )
+    assert differing == 0
+
+
+def test_longer_lookbacks_never_find_fewer_journeys(built):
+    engine, _, _ = built
+    journeys = dict(
+        rows(
+            engine,
+            "SELECT lookback_days, count(DISTINCT lead_id) FROM mart.lead_attribution_credits"
+            " WHERE evidence_tier = 'T1_journey' GROUP BY 1",
+        )
+    )
+    default_tiers = scalar(
+        engine,
+        "SELECT count(*) FROM core.leads l WHERE l.evidence_tier IS DISTINCT FROM ("
+        " SELECT max(c.evidence_tier) FROM mart.lead_attribution_credits c"
+        " WHERE c.lead_id = l.id AND c.lookback_days = 30) AND l.duplicate_of IS NULL",
+    )
+
+    assert journeys[7] <= journeys[30] <= journeys[90]
+    assert default_tiers == 0  # the core tier is the 30-day tier

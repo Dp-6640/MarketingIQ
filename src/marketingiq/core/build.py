@@ -17,6 +17,7 @@ from marketingiq.core.records import CoreRecords, build_records
 from marketingiq.core.rules import Rules, load_rulebook
 from marketingiq.db import copy_records
 from marketingiq.ingest.staging import STAGING_TABLES
+from marketingiq.mart import tables as mart
 from marketingiq.models import LoadBatch, Organization
 
 REQUIRED = ("meta_insights_daily", "ga4_sessions", "sf_leads", "campaign_mapping_sheet")
@@ -48,7 +49,7 @@ def build_core(engine: Engine, org_slug: str, rules: Rules | None = None) -> Bui
         }
         records = build_records(staging, rules, reporting_tz=org.reporting_tz)
 
-        for table in t.REBUILT_TABLES:
+        for table in (*mart.REBUILT_TABLES, *t.REBUILT_TABLES):
             conn.execute(delete(table).where(table.c.org_id == org.id))
         _write(conn, org.id, records)
         run_id = conn.execute(
@@ -179,3 +180,33 @@ def _write(conn: Connection, org_id: int, records: CoreRecords) -> None:
     )
     if records.annotations:
         conn.execute(insert(t.annotations), [{"org_id": org_id, **a} for a in records.annotations])
+
+    session_ids = {
+        (pseudo_id, ga_session_id): session_id
+        for pseudo_id, ga_session_id, session_id in conn.execute(
+            select(
+                t.web_sessions.c.user_pseudo_id,
+                t.web_sessions.c.ga_session_id,
+                t.web_sessions.c.id,
+            ).where(t.web_sessions.c.org_id == org_id)
+        )
+    }
+    copy_records(
+        conn,
+        mart.lead_attribution_credits,
+        (
+            {
+                "org_id": org_id,
+                "lead_id": lead_ids[source_id],
+                "model": credit.model,
+                "lookback_days": lookback_days,
+                "evidence_tier": credit.evidence_tier,
+                "session_id": session_ids[credit.session] if credit.session else None,
+                "campaign_id": campaign_ids.get(credit.campaign_key),
+                "campaign_value": credit.campaign_value,
+                "channel": credit.channel,
+                "credit": credit.credit,
+            }
+            for source_id, lookback_days, credit in records.credits
+        ),
+    )

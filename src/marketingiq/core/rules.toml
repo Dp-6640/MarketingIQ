@@ -202,3 +202,5 @@ version = "2026-10-15"
 verified = false
 # Sessions this many days before a lead (or less) count as its journey.
 lookback_days = 30
+# Attribution credits are built for each of these windows; the default must be one of them.
+supported_lookback_days = [7, 30, 90]

@@ -77,3 +77,26 @@ def test_succeeded_file_cannot_be_loaded_twice(migrated):
 
     with pytest.raises(Exception, match="uq_load_batches_succeeded_file"), migrated.begin() as conn:
         conn.execute(insert_batch, {"org": org_id, "sha": "a" * 64, "status": "succeeded"})
+
+
+def test_every_foreign_key_has_a_supporting_index():
+    """Rebuilds delete whole tables. Without an index on a referencing column, Postgres
+    checks each deleted row with a full scan of the referencing table: a rebuild of 138,000
+    sessions took over five minutes before these indexes existed. Organizations are never
+    deleted, so their foreign keys are exempt."""
+    missing = []
+    for table in metadata.sorted_tables:
+        indexed = [tuple(c.name for c in index.columns) for index in table.indexes]
+        indexed += [
+            tuple(c.name for c in constraint.columns)
+            for constraint in table.constraints
+            if constraint.__class__.__name__ in ("PrimaryKeyConstraint", "UniqueConstraint")
+        ]
+        for fk in table.foreign_key_constraints:
+            columns = tuple(c.name for c in fk.columns)
+            if columns == ("org_id",):
+                continue
+            if not any(index[: len(columns)] == columns for index in indexed):
+                missing.append(f"{table.fullname}.{','.join(columns)}")
+
+    assert missing == []

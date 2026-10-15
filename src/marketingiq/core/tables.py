@@ -76,6 +76,7 @@ campaign_identifiers = Table(
     Column("kind", Text, nullable=False),
     Column("value", Text, nullable=False),
     PrimaryKeyConstraint("org_id", "kind", "value"),
+    Index(None, "campaign_id"),
     one_of("kind", ("meta_campaign_id", "utm_campaign")),
     schema="core",
 )
@@ -141,6 +142,7 @@ web_sessions = Table(
     UniqueConstraint("org_id", "user_pseudo_id", "ga_session_id"),
     Index(None, "org_id", "started_at"),
     Index(None, "campaign_id"),
+    Index(None, "landing_page_id"),
     one_of("channel", vocab.CHANNELS),
     schema="core",
 )
@@ -194,6 +196,8 @@ leads = Table(
     Index(None, "org_id", "lead_class", "created_at"),
     Index(None, "org_id", "ga_client_id"),
     Index(None, "org_id", "person_key"),
+    Index(None, "duplicate_of"),
+    Index(None, "evidence_campaign_id"),
     one_of("stage", vocab.LEAD_STAGES),
     one_of("stage_time_source", ("field", "unavailable")),
     one_of("entry_point", vocab.ENTRY_POINTS),

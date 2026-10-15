@@ -6,11 +6,12 @@ build step turns those into database ids when it writes them.
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from marketingiq.core import vocabulary as vocab
 from marketingiq.core.rules import EvidenceInput, LeadKey, Rules, find_duplicates
+from marketingiq.mart.attribution import Credit, Touch, attribute
 
 Row = dict[str, Any]
 
@@ -26,14 +27,18 @@ class CoreRecords:
     appointments: list[Row] = field(default_factory=list)
     opportunities: list[Row] = field(default_factory=list)
     annotations: list[Row] = field(default_factory=list)
+    # (lead source id, lookback days, credit)
+    credits: list[tuple[str, int, Credit]] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
 
 
 def build_records(staging: dict[str, list[Row]], rules: Rules, *, reporting_tz: str) -> CoreRecords:
     records = CoreRecords()
     by_identifier = _campaigns(staging, rules, records)
-    journeys = _sessions(staging["ga4_sessions"], rules, by_identifier, records)
-    _leads(staging["sf_leads"], rules, by_identifier, journeys, records)
+    touches = _sessions(staging["ga4_sessions"], rules, by_identifier, records)
+    starts = {pseudo_id: [t.started_at for t in visits] for pseudo_id, visits in touches.items()}
+    inputs = _leads(staging["sf_leads"], rules, by_identifier, starts, records)
+    _credits(inputs, rules, by_identifier, touches, starts, records)
     _appointments_and_opportunities(staging, rules, records)
     records.annotations = [
         {k: row[k] for k in ("annotation_type", "start_date", "end_date", "label")}
@@ -126,10 +131,12 @@ def _sessions(
     by_identifier: dict[tuple[str, str], str],
     records: CoreRecords,
 ) -> dict[str, list[datetime]]:
-    """Canonical sessions; returns each GA client id's sorted session start times."""
-    journeys: dict[str, list[datetime]] = defaultdict(list)
+    """Canonical sessions; returns each GA client id's visits, sorted."""
+    touches: dict[str, list[Touch]] = defaultdict(list)
     for row in rows:
         value = rules.campaign_value(row["campaign"])
+        campaign_key = by_identifier.get(("utm_campaign", value)) if value else None
+        channel = rules.channel(row["source"], row["medium"])
         _page(row["landing_page"], rules, records)
         records.sessions.append(
             {
@@ -138,9 +145,9 @@ def _sessions(
                 "started_at": row["session_start_utc"],
                 "source": row["source"],
                 "medium": row["medium"],
-                "channel": rules.channel(row["source"], row["medium"]),
+                "channel": channel,
                 "campaign_value": value,
-                "campaign_key": by_identifier.get(("utm_campaign", value)) if value else None,
+                "campaign_key": campaign_key,
                 "landing_page": row["landing_page"],
                 "device": row["device_category"],
                 "has_gclid": row["has_gclid"],
@@ -148,10 +155,19 @@ def _sessions(
                 **{name: row[name] for name in _EVENTS},
             }
         )
-        journeys[row["user_pseudo_id"]].append(row["session_start_utc"])
-    for starts in journeys.values():
-        starts.sort()
-    return journeys
+        touches[row["user_pseudo_id"]].append(
+            Touch(
+                row["user_pseudo_id"],
+                row["ga_session_id"],
+                row["session_start_utc"],
+                channel,
+                campaign_key,
+                value,
+            )
+        )
+    for visits in touches.values():
+        visits.sort(key=lambda touch: (touch.started_at, touch.ga_session_id))
+    return touches
 
 
 _EVENTS = (
@@ -167,9 +183,11 @@ def _leads(
     rows: list[Row],
     rules: Rules,
     by_identifier: dict[tuple[str, str], str],
-    journeys: dict[str, list[datetime]],
+    starts: dict[str, list[datetime]],
     records: CoreRecords,
-) -> None:
+) -> dict[str, EvidenceInput]:
+    """Canonical leads; returns the evidence inputs of first leads (not duplicates)."""
+    inputs: dict[str, EvidenceInput] = {}
     keys = [LeadKey(r["id"], r["person_key"], r["created_date"], r["is_test"]) for r in rows]
     duplicates = find_duplicates(keys, rules.duplicate_window)
     version = rules.book.classification.version
@@ -211,20 +229,18 @@ def _leads(
 
         evidence = None
         if duplicate_of is None:
-            evidence = rules.evidence(
-                EvidenceInput(
-                    created_at=row["created_date"],
-                    entry_point=entry_point,
-                    ga_client_id=row["ga_client_id"],
-                    meta_campaign_id=row["meta_campaign_id"],
-                    utm_source=row["utm_source"],
-                    utm_medium=row["utm_medium"],
-                    utm_campaign=row["utm_campaign"],
-                    click_id_type=row["click_id_type"],
-                    lead_source=row["lead_source"],
-                ),
-                journeys.get(row["ga_client_id"] or "", []),
+            inputs[row["id"]] = EvidenceInput(
+                created_at=row["created_date"],
+                entry_point=entry_point,
+                ga_client_id=row["ga_client_id"],
+                meta_campaign_id=row["meta_campaign_id"],
+                utm_source=row["utm_source"],
+                utm_medium=row["utm_medium"],
+                utm_campaign=row["utm_campaign"],
+                click_id_type=row["click_id_type"],
+                lead_source=row["lead_source"],
             )
+            evidence = rules.evidence(inputs[row["id"]], starts.get(row["ga_client_id"] or "", []))
 
         records.leads.append(
             {
@@ -273,6 +289,33 @@ def _leads(
                 "evidence_channel": evidence.channel if evidence else None,
             }
         )
+
+    return inputs
+
+
+def _credits(
+    inputs: dict[str, EvidenceInput],
+    rules: Rules,
+    by_identifier: dict[tuple[str, str], str],
+    touches: dict[str, list[Touch]],
+    starts: dict[str, list[datetime]],
+    records: CoreRecords,
+) -> None:
+    """Attribution credits for every first lead, model and supported lookback window."""
+    for lookback_days in rules.book.attribution.supported_lookback_days:
+        lookback = timedelta(days=lookback_days)
+        for source_id, lead in inputs.items():
+            client = lead.ga_client_id or ""
+            evidence = rules.evidence(lead, starts.get(client, []), lookback)
+            campaign_key = by_identifier.get(evidence.identifier) if evidence.identifier else None
+            credits = attribute(
+                created_at=lead.created_at,
+                evidence=evidence,
+                evidence_campaign_key=campaign_key,
+                touches=touches.get(client, []),
+                lookback=lookback,
+            )
+            records.credits.extend((source_id, lookback_days, credit) for credit in credits)
 
 
 def _appointments_and_opportunities(

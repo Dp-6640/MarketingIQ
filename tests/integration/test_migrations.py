@@ -15,11 +15,12 @@ def test_upgrade_creates_schemas_and_tables(migrated):
     insp = inspect(migrated)
 
     assert set(SCHEMAS) <= set(insp.get_schema_names())
-    assert set(insp.get_table_names(schema="core")) == {
-        "organizations",
-        "load_batches",
-        "rejected_rows",
-    }
+    for schema in ("core", "staging"):
+        defined = {table.name for table in metadata.sorted_tables if table.schema == schema}
+        assert set(insp.get_table_names(schema=schema)) == defined
+    assert {"organizations", "load_batches", "leads", "web_sessions"} <= set(
+        insp.get_table_names(schema="core")
+    )
     assert set(insp.get_table_names(schema="staging")) == set(STAGING_TABLES)
 
 

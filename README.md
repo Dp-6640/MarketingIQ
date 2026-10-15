@@ -19,6 +19,7 @@ MarketingIQ is a proposed **internal, read-only marketing intelligence assistant
 - `docs/attribution.md` — attribution evidence tiers and model rules.
 - `docs/synthetic-data.md` — generator assumptions, planted scenarios and output files (all values synthetic).
 - `docs/loading.md` — how files load into staging, and the loader's error codes.
+- `docs/core-model.md` — how the core model is built, the rule book, results and known limitations.
 - `docs/question-tool-map.md` — each canonical question mapped to tools, metrics and expected caveats; seed for the benchmark.
 - `docs/source-to-canonical.md` — proposed source mappings and data flow.
 - `docs/unverified-register.md` — unknowns, provisional defaults and how to verify them.
@@ -44,6 +45,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and PostgreSQL 18 (16+ should wor
 4. Run the API: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127.0.0.1:8000/health`.
 5. Generate synthetic data: `uv run python -m synthetic generate` writes a fictional 24-month dataset to `data/synthetic/` (ignored by git). See `docs/synthetic-data.md`.
 6. Load it into staging: `uv run alembic upgrade head`, then `uv run python -m marketingiq.ingest load data/synthetic/default-seed-20261014`. See `docs/loading.md`.
+7. Build the core model: `uv run python -m marketingiq.core build --org synthetic-home-services`. See `docs/core-model.md`.
 
 Phase 0 definitions live in `docs/`. No LLM and no company data are part of the project at this stage.
 

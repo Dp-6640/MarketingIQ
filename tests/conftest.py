@@ -46,7 +46,7 @@ def reset_database(engine: Engine) -> None:
         conn.execute(text("DROP TABLE IF EXISTS public.alembic_version"))
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def alembic_cfg(test_engine) -> Config:
     cfg = Config("alembic.ini")
     cfg.attributes["url"] = test_engine.url.render_as_string(hide_password=False)
@@ -58,6 +58,15 @@ def alembic_cfg(test_engine) -> Config:
 @pytest.fixture
 def migrated(test_engine, alembic_cfg):
     """The test database, wiped and migrated to the latest revision."""
+    reset_database(test_engine)
+    command.upgrade(alembic_cfg, "head")
+    yield test_engine
+    reset_database(test_engine)
+
+
+@pytest.fixture(scope="module")
+def migrated_module(test_engine, alembic_cfg):
+    """Like `migrated`, but shared by every test in one module (for expensive setups)."""
     reset_database(test_engine)
     command.upgrade(alembic_cfg, "head")
     yield test_engine

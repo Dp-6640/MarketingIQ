@@ -53,6 +53,8 @@ The public quote form collects only name, phone, email, city and a free-text mes
 
 Whenever an acquisition figure includes leads whose request type came from `entry_point_default` or `campaign`, the result carries `classification_default_applied`, and data quality reports that share.
 
+**Known effect, found by the ground-truth tests:** a non-sales submission sent through the quote form (for example a nomination) gets the `install_replace` default and is classed as acquisition. In the synthetic data that's 66 of 4,300 acquisition leads (1.5%). Only the free-text message, which is never read, would tell them apart; a real fix needs a form-type field or a separate nomination form. See `docs/core-model.md`.
+
 ## Service line enum (proposed)
 
 - `furnace`

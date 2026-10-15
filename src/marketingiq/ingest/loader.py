@@ -19,8 +19,10 @@ from sqlalchemy import Connection, Engine, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 
+from marketingiq.db import copy_records
 from marketingiq.ingest.parsing import FileError, ParsedFile, parse_file
 from marketingiq.ingest.sources import SOURCES, Source
+from marketingiq.ingest.staging import STAGING_TABLES
 from marketingiq.models import LoadBatch, Organization, RejectedRow
 
 # Problems that fail one file but shouldn't stop the rest of a dataset from loading.
@@ -118,13 +120,14 @@ def load_file(
 
 
 def _copy_rows(conn: Connection, source: Source, batch_id: int, parsed: ParsedFile) -> None:
-    """Bulk-insert valid rows with PostgreSQL COPY, inside the caller's transaction."""
-    fields = list(source.row_model.model_fields)
-    columns = ", ".join(["load_batch_id", "source_row", *fields])
-    statement = f"COPY staging.{source.entity} ({columns}) FROM STDIN"
-    with conn.connection.dbapi_connection.cursor() as cursor, cursor.copy(statement) as copy:
-        for number, row in parsed.rows:
-            copy.write_row((batch_id, number, *(getattr(row, name) for name in fields)))
+    copy_records(
+        conn,
+        STAGING_TABLES[source.entity],
+        (
+            {"load_batch_id": batch_id, "source_row": number, **row.model_dump()}
+            for number, row in parsed.rows
+        ),
+    )
 
 
 def _store_rejections(conn: Connection, batch_id: int, parsed: ParsedFile) -> None:

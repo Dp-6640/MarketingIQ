@@ -106,7 +106,16 @@ def test_single_touch_tiers_give_the_same_credit_under_every_model():
         "T3_platform_native", identifier=("meta_campaign_id", "99"), channel="paid_social"
     )
 
-    for evidence, key, value in ((captured, "x", "x"), (native, None, "meta:99")):
+    click_only = Evidence(
+        "T2_captured_source", identifier=("click_id", "gclid"), channel="paid_search"
+    )
+
+    for evidence, key, value in (
+        (captured, "x", "x"),
+        (native, None, "meta:99"),
+        # attribution.md: a click ID alone names no campaign, so its credit is (unmapped).
+        (click_only, None, "(gclid)"),
+    ):
         credits = credits_by_model([], evidence, campaign_key=key)
         assert {
             (c.campaign_key, c.campaign_value, c.credit) for m in MODELS for c in credits[m]

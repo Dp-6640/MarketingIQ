@@ -203,7 +203,7 @@ def test_platform_native_id_beats_captured_utms(rules):
     assert result.identifier == ("meta_campaign_id", "1202")
 
 
-def test_captured_utms_name_the_campaign_but_a_click_id_only_the_channel(rules):
+def test_captured_utms_name_the_campaign_and_a_click_id_an_unmapped_one(rules):
     tagged = rules.evidence(
         lead(utm_source="facebook", utm_medium="paid_social", utm_campaign="Meta_X"), []
     )
@@ -216,7 +216,7 @@ def test_captured_utms_name_the_campaign_but_a_click_id_only_the_channel(rules):
     )
     assert (click_only.tier, click_only.identifier, click_only.channel) == (
         "T2_captured_source",
-        None,
+        ("click_id", "gclid"),
         "paid_search",
     )
 

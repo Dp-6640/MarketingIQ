@@ -67,7 +67,10 @@ def attribute(
         value = None
         if evidence.identifier is not None:
             kind, identifier = evidence.identifier
-            value = identifier if kind == "utm_campaign" else f"meta:{identifier}"
+            value = {"utm_campaign": identifier, "meta_campaign_id": f"meta:{identifier}"}.get(
+                kind,
+                f"({identifier})",  # a click ID alone: "(gclid)", "(fbclid)"
+            )
         return [
             Credit(model, tier, None, evidence_campaign_key, value, evidence.channel, Decimal(1))
             for model in MODELS

@@ -406,7 +406,11 @@ class Rules:
                     lead.click_id_type or ""
                 )
             value = self.campaign_value(lead.utm_campaign)
-            identifier = ("utm_campaign", value) if value else None
+            if value:
+                identifier = ("utm_campaign", value)
+            else:
+                # A click ID points at a campaign nobody can name: credit goes to (unmapped).
+                identifier = ("click_id", lead.click_id_type or "")
             return Evidence("T2_captured_source", detail, identifier, channel)
         reported = self.book.salesforce.lead_source_channels.get(lead.lead_source or "")
         if reported:

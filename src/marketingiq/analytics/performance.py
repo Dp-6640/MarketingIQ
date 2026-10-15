@@ -55,6 +55,7 @@ Population = Literal[
     "all",
 ]
 LEAD_FILTERS = ("service_lines", "regions", "entry_points")
+AmountBasis = Literal["purchase_price", "financed_total", "lease_contract", "monthly"]
 
 
 class Filters(BaseModel):
@@ -80,9 +81,7 @@ class PerformanceQuery(BaseModel):
     filters: Filters = Field(default_factory=Filters)
     attribution_model: Literal["first_touch", "last_non_direct", "linear"] = "last_non_direct"
     lookback_days: Literal[7, 30, 90] = 30
-    amount_basis: (
-        Literal["purchase_price", "financed_total", "lease_contract", "monthly"] | None
-    ) = None
+    amount_basis: AmountBasis | None = None
     sort_by: MetricName | None = None
     sort_desc: bool = True
     limit: int = Field(25, ge=1, le=100)

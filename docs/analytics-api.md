@@ -1,6 +1,6 @@
 # Analytics Services and REST API
 
-Every number MarketingIQ shows comes from one of six services in `src/marketingiq/analytics/`.
+Every number MarketingIQ shows comes from one of seven services in `src/marketingiq/analytics/`.
 The REST API is a thin layer over them, and the assistant (Phase 4) will call the same services
 as tools. A query is the same Pydantic model in all three places, so it means the same thing
 everywhere. All read paths use the read-only `miq_app` role.
@@ -12,9 +12,10 @@ Run it: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127
 | Method and path | Service | Answers |
 |---|---|---|
 | `GET /health` | – | Is the API up, and can it reach the database? |
-| `GET /api/v1/campaigns?search=` | – | Which campaign key is "the furnace campaign"? |
+| `GET /api/v1/dimensions/{dimension}/values?search=` | `list_dimension_values` | Which campaign is "the furnace campaign"? Which region is Kitchener in? `match` is `none`, `one` or `several`, so an ambiguous name leads to a clarifying question, never a guess |
 | `GET /api/v1/annotations?start=&end=&annotation_type=` | – | What happened in the business around these dates? |
 | `POST /api/v1/analytics/performance` | `get_performance` | Any registry metric, by up to two dimensions, with a comparison |
+| `POST /api/v1/analytics/attribution-models` | `compare_attribution_models` | Credit under first touch, last non-direct and linear side by side, with the evidence tiers that limit the comparison |
 | `POST /api/v1/analytics/funnel` | `get_lead_funnel` | Leads → contacted → booked → qualified → opportunity → won, with stage rates |
 | `POST /api/v1/analytics/reconciliation` | `get_source_reconciliation` | GA4 vs Meta-reported vs CRM, side by side and never added together |
 | `POST /api/v1/analytics/change` | `explain_metric_change` | Which segments moved a metric between two periods |
@@ -50,6 +51,12 @@ Some questions ask which rows meet a condition ("campaigns with cheap leads that
 | `cheap_leads_low_qualification` | Cost per lead below the median and qualification rate below the median, among campaigns with spend and at least 10 credited leads; at least 3 such campaigns, or nothing is flagged | `group_by=["campaign"]`, `cost_per_lead` among the metrics |
 
 A row whose counts are hidden by small-cell suppression is not judged, so a flag can't reveal a hidden value.
+
+## The model comparison
+
+`compare_attribution_models` measures the same leads under all three models and lists them side by side, with a `spread` per row (the largest minus the smallest credit). Models only differ for leads with a web journey (T1), so the result always includes the evidence-tier breakdown, `journey_share` (the T1 share: the part of the population the comparison is really about) and `campaign_coverage` (T1–T3). If any model's value for a row is under 5, the whole row is hidden: three views of one small count would otherwise reveal it.
+
+On the default synthetic data, over the year to September 2026, retargeting is credited with 91 leads under first touch, 152 under last non-direct and 177 under linear (scenario S08), while prospecting goes the other way (229 → 78). Only 32% of the leads have a journey, which is why the result says so.
 
 ## The four reports, briefly
 

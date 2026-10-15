@@ -11,6 +11,7 @@ from fractions import Fraction
 
 import pytest
 
+from marketingiq.analytics.attribution_report import AttributionQuery, compare_attribution_models
 from marketingiq.analytics.metrics import BASES
 from marketingiq.analytics.performance import PerformanceQuery, load_context, measure
 from marketingiq.analytics.periods import resolve
@@ -174,3 +175,25 @@ def test_the_oracle_sees_the_planted_unmapped_campaign(world):
     assert unmapped, "scenario S09 should leave a Meta campaign out of the mapping sheet"
     spend = count.ad_measure(facts, *QUARTER, "spend", ("campaign",))
     assert any(spend.get((c.key,), Decimal(0)) > 0 for c in unmapped)
+
+
+@pytest.mark.parametrize("group_by", ["campaign", "channel", "campaign_tactic"])
+def test_model_comparison_matches_the_oracle(world, group_by):
+    engine, facts = world
+    period = {"preset": "custom", "start": str(QUARTER[0]), "end": str(QUARTER[1])}
+    result = compare_attribution_models(
+        engine, ORG, AttributionQuery.model_validate({"period": period, "group_by": group_by})
+    )
+
+    assert result["total"] == count.leads(facts, *QUARTER)[()]
+    shown = [row for row in result["rows"] if not row.get("suppressed")]
+    assert shown
+    for model in MODELS:
+        expected = count.leads(facts, *QUARTER, group_by=(group_by,), model=model)
+        for row in shown:
+            oracle = expected.get((_key(row["key"]),), 0)
+            assert row["credit"][model] == pytest.approx(float(oracle), abs=0.01), (model, row)
+    tiers = count.tiers(facts, *QUARTER)
+    for tier, cell in result["evidence"]["by_tier"].items():
+        if not cell.get("suppressed"):
+            assert cell["value"] == tiers.get(tier, 0), tier

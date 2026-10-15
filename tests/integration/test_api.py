@@ -25,12 +25,22 @@ def client(migrated_module, app_role_engine, tmp_path_factory):
     app.dependency_overrides.clear()
 
 
-def test_campaign_search_finds_by_name_or_key(client):
-    everything = client.get("/api/v1/campaigns").json()["campaigns"]
-    furnace = client.get("/api/v1/campaigns", params={"search": "furnace"}).json()["campaigns"]
+def test_dimension_values_resolve_names_and_flag_ambiguity(client):
+    def find(dimension, search=None):
+        params = {"search": search} if search else {}
+        return client.get(f"/api/v1/dimensions/{dimension}/values", params=params).json()
 
-    assert len(everything) > len(furnace) > 0
-    assert all("furnace" in (c["name"] + c["key"]).lower() for c in furnace)
+    furnace = find("campaign", "furnace")
+    assert furnace["match"] == "several"
+    assert all("furnace" in (v["value"] + v["label"]).lower() for v in furnace["values"])
+    assert find("campaign", "furnace promo")["match"] == "one"
+    assert find("region", "kitchener")["values"][0]["value"] == "kw_guelph"
+    assert find("campaign", "no such thing")["match"] == "none"
+    assert find("campaign")["count"] > len(furnace["values"])
+
+
+def test_dimensions_that_are_not_names_are_rejected(client):
+    assert client.get("/api/v1/dimensions/lead_month/values").status_code == 422
 
 
 def test_annotations_overlap_the_requested_range(client):
@@ -59,6 +69,7 @@ def test_performance_endpoint_matches_the_service(client):
         ("reconciliation", {"period": QUARTER}),
         ("data-quality", {"period": QUARTER}),
         ("change", {"metric": "spend", "dimension": "campaign", "period": MARCH}),
+        ("attribution-models", {"period": QUARTER, "group_by": "channel"}),
     ],
 )
 def test_every_report_answers(client, path, body):

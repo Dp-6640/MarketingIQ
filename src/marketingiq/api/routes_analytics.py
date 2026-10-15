@@ -11,7 +11,13 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Engine, text
 
+from marketingiq.analytics.attribution_report import AttributionQuery, compare_attribution_models
 from marketingiq.analytics.change import ChangeQuery, explain_metric_change
+from marketingiq.analytics.dimensions import (
+    DimensionValuesQuery,
+    ResolvableDimension,
+    list_dimension_values,
+)
 from marketingiq.analytics.performance import PerformanceQuery, get_performance
 from marketingiq.analytics.quality import QualityQuery, get_data_quality
 from marketingiq.analytics.reports import (
@@ -35,25 +41,17 @@ def organization(org: Annotated[str | None, Query(description="organization slug
 Org = Annotated[str, Depends(organization)]
 
 
-@router.get("/campaigns")
-def list_campaigns(
+@router.get("/dimensions/{dimension}/values")
+def dimension_values(
+    dimension: ResolvableDimension,
     engine: AppEngine,
     org: Org,
     search: Annotated[str | None, Query(max_length=100)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
-    """Campaigns, for finding the key of "the furnace campaign" before querying it."""
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                "SELECT c.key, c.name, c.platform, c.tactic, c.service_lines, c.region,"
-                " c.in_mapping_sheet, c.has_spend_feed FROM core.campaigns c"
-                " JOIN core.organizations o ON o.id = c.org_id WHERE o.slug = :org"
-                " AND (CAST(:search AS text) IS NULL OR c.name ILIKE '%' || :search || '%'"
-                "  OR c.key ILIKE '%' || :search || '%') ORDER BY c.name"
-            ),
-            {"org": org, "search": search},
-        ).mappings()
-        return {"campaigns": [dict(row) for row in rows]}
+    """Find exact values by name ("the furnace campaign"); `match` says if several fit."""
+    query = DimensionValuesQuery(dimension=dimension, search=search, limit=limit)
+    return list_dimension_values(engine, org, query)
 
 
 @router.get("/annotations")
@@ -84,6 +82,11 @@ def list_annotations(
 @router.post("/analytics/performance")
 def performance(query: PerformanceQuery, engine: AppEngine, org: Org) -> dict[str, Any]:
     return get_performance(engine, org, query)
+
+
+@router.post("/analytics/attribution-models")
+def attribution_models(query: AttributionQuery, engine: AppEngine, org: Org) -> dict[str, Any]:
+    return compare_attribution_models(engine, org, query)
 
 
 @router.post("/analytics/funnel")

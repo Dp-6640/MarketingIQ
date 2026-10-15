@@ -33,7 +33,7 @@ landing_rate = 0.92
 [traffic]
 # Households with a need that make contact on their own (not via a Meta ad), all regions,
 # per day, before seasonality, weekday, growth and event multipliers.
-demand_households_per_day = 22.0
+demand_households_per_day = 20.0
 # Website sessions from visitors with no need (job seekers, browsers, ...).
 no_need_sessions_per_day = 75.0
 growth_per_year = 0.08
@@ -375,7 +375,7 @@ seasons = [["10-01", "12-31"]]
 daily_budget = 45.0
 cpm = 9.0
 link_ctr = 0.006
-form_completion = 0.040
+form_completion = 0.032
 
 [[campaigns]]
 key = "meta_lead_form_ac_promo"
@@ -389,7 +389,7 @@ seasons = [["05-01", "07-31"]]
 daily_budget = 35.0
 cpm = 9.0
 link_ctr = 0.006
-form_completion = 0.035
+form_completion = 0.028
 
 [[campaigns]]
 key = "meta_retargeting_all"

@@ -511,6 +511,9 @@ class WorldConfig(StrictModel):
             raise ValueError("region keys must be unique")
         _check_distribution({r.key: r.share for r in self.regions}, None)
 
+        for profile in ("web", "business"):
+            if profile not in self.hours:
+                raise ValueError(f"hours profile {profile!r} is missing")
         for profile in (*WEB_CHANNELS, "no_need"):
             if profile not in self.landing:
                 raise ValueError(f"landing profile {profile!r} is missing")

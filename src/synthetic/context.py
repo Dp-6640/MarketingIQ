@@ -33,6 +33,7 @@ class Context:
             for region in config.regions
         }
         self.city_slug = {city.name: city.slug for r in config.regions for city in r.cities}
+        self.city_aliases = {city.name: city.aliases for r in config.regions for city in r.cities}
         slugs = [city.slug for region in config.regions for city in region.cities if city.slug]
         self.pick_location_slug = Categorical.uniform(slugs) if slugs else None
         self.pick_device = Categorical(traffic.device_mix)

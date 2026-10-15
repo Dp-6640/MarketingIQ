@@ -41,6 +41,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and PostgreSQL 18 (16+ should wor
    ```
 
 4. Run the API: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127.0.0.1:8000/health`.
+5. Generate synthetic data: `uv run python -m synthetic generate` writes a fictional 24-month dataset to `data/synthetic/` (ignored by git). See `docs/synthetic-data.md`.
 
 Phase 0 definitions live in `docs/`. No LLM and no company data are part of the project at this stage.
 

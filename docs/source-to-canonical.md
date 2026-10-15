@@ -19,7 +19,7 @@ This mapping describes an intended adapter boundary. It is not a verified invent
 - `organizations` — reporting timezone, currency, `is_synthetic`, `data_as_of`.
 - `load_batches`, `rejected_rows` — input lineage and row validation.
 - `regions`, `cities`, `city_aliases` — normalized location grouping; keep unverified aliases marked.
-- `campaigns`, `campaign_mappings`, `channel_rules` — canonical campaign identity and versioned mappings. Campaigns carry a `tactic` attribute (`prospecting`, `retargeting`, `lead_form`, `brand`, `promo`, `other`) taken from a versioned naming-convention mapping (U-22); needed for retargeting questions.
+- `campaigns`, `campaign_mappings`, `channel_rules` — canonical campaign identity and versioned mappings. Campaigns carry a `tactic` attribute (`prospecting`, `retargeting`, `lead_form`, `messaging`, `promo`, `search`, `email`, `other`) taken from a versioned naming-convention mapping (U-22); needed for retargeting questions.
 - `annotations` — dated business events a marketer would know about: landing-page changes, promotions, weather or demand events, tracking incidents (`type`, `start_date`, `end_date`, `label`, `source`). In synthetic data they come from the generator's *public* event list. They record **that** something happened, never its effect, so they are not ground truth. Needed for before/after and demand-event questions.
 - `ad_spend_daily`, `platform_reported_conversions` — separate ad platform observations.
 - `landing_pages`, `web_sessions` — aggregate/session-level web facts needed for synthetic attribution.

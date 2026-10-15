@@ -127,6 +127,8 @@ def test_the_assistant_answers_through_the_api(client):
     body = response.json()
     assert response.status_code == 200 and body["status"] == "answered"
     assert body["citations"][0]["path"] == "totals.leads"
+    assert body["segments"][0] == {"value": body["citations"][0]["shown"], "citation": 0}
+    assert body["segments"][1] == {"text": " leads."}
     assert body["calls"][0]["tool"] == "get_performance"
 
 
@@ -138,3 +140,9 @@ def test_the_assistant_says_when_no_model_is_configured(client, monkeypatch):
     response = client.post("/api/v1/assistant/ask", json={"question": "How many leads?"})
 
     assert response.status_code == 503 and "LLM_API_KEY" in response.json()["detail"]
+
+
+def test_the_demo_page_is_served(client):
+    response = client.get("/")
+
+    assert response.status_code == 200 and "Synthetic data" in response.text

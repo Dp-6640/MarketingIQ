@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MarketingIQ</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dfe3e8;
+    --accent: #1f5fbf; --accent-soft: #e6eefb; --warn: #8a5a00; --warn-soft: #fff4dc;
+    --bad: #a3262c; --bad-soft: #fde8e9; --good: #1d6b3a; --good-soft: #e3f4e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418; --panel: #1a1e24; --ink: #e8ebef; --muted: #9aa3ae; --line: #2c323a;
+      --accent: #7fb0ff; --accent-soft: #1d2b44; --warn: #f2c46b; --warn-soft: #3a2f17;
+      --bad: #ff8f95; --bad-soft: #3f1d20; --good: #7fd69c; --good-soft: #17301f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; }
+  .tagline { color: var(--muted); }
+  .banner { margin: 16px 0 20px; padding: 10px 14px; border-radius: 8px;
+            background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+           padding: 16px; margin-bottom: 16px; }
+  textarea { width: 100%; min-height: 72px; resize: vertical; padding: 10px 12px;
+             border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+             color: var(--ink); font: inherit; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  button { font: inherit; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+  .ask { background: var(--accent); color: #fff; border-color: var(--accent);
+         padding: 8px 18px; font-weight: 600; }
+  .ask:disabled { opacity: .6; cursor: progress; }
+  .example { background: transparent; color: var(--accent); padding: 4px 10px; font-size: 13px; }
+  .status { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+            text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+  .status.answered { background: var(--good-soft); color: var(--good); }
+  .status.clarify, .status.abstain { background: var(--accent-soft); color: var(--accent); }
+  .status.refuse, .status.failed { background: var(--bad-soft); color: var(--bad); }
+  .answer { font-size: 16px; margin: 12px 0 4px; white-space: pre-wrap; }
+  mark { background: var(--accent-soft); color: var(--ink); padding: 0 3px; border-radius: 4px;
+         font-weight: 600; cursor: help; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+       margin: 18px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  td code, li code { font-size: 12px; word-break: break-all; }
+  ul.caveats { margin: 0; padding-left: 18px; color: var(--muted); }
+  details pre { background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto;
+                font-size: 12px; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 12px; }
+  .error { color: var(--bad); }
+  .hidden { display: none; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>MarketingIQ</h1>
+    <span class="tagline">Marketing questions answered from computed numbers</span>
+  </header>
+  <div class="banner">Synthetic data: every number describes a fictional business.</div>
+
+  <section class="panel">
+    <label for="question" class="tagline">Ask a question</label>
+    <textarea id="question" placeholder="Which campaigns brought in the most qualified new-customer leads last month?"></textarea>
+    <div class="row">
+      <button class="ask" id="ask">Ask</button>
+      <span class="tagline" id="working"></span>
+    </div>
+    <div class="row" id="examples"></div>
+  </section>
+
+  <section class="panel hidden" id="result">
+    <span class="status" id="status"></span>
+    <p class="answer" id="answer"></p>
+    <p class="error hidden" id="errors"></p>
+
+    <h2>Where each number comes from</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Value</th><th>Tool call</th><th>Path in the result</th></tr></thead>
+        <tbody id="evidence"></tbody>
+      </table>
+    </div>
+
+    <h2>Caveats</h2>
+    <ul class="caveats" id="caveats"></ul>
+
+    <h2>Tool calls</h2>
+    <details><summary id="trace-summary"></summary><pre id="trace"></pre></details>
+    <p class="meta" id="meta"></p>
+  </section>
+</main>
+<script>
+const EXAMPLES = [
+  "Which campaigns brought in the most qualified new-customer leads last month?",
+  "How much credit does retargeting get under each attribution model over the past year?",
+  "Did the location-page redesign change how often visitors submit a form?",
+  "What can't we conclude about July 2026?",
+  "How is the furnace campaign doing?",
+  "List the phone numbers of the leads from Barrie.",
+];
+const $ = (id) => document.getElementById(id);
+const el = (tag, text, attrs = {}) => {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;  // model text is never parsed as HTML
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+};
+
+for (const text of EXAMPLES) {
+  const button = el("button", text, { class: "example", type: "button" });
+  button.addEventListener("click", () => { $("question").value = text; ask(); });
+  $("examples").append(button);
+}
+$("ask").addEventListener("click", ask);
+$("question").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ask();
+});
+
+async function ask() {
+  const question = $("question").value.trim();
+  if (question.length < 3) return;
+  $("ask").disabled = true;
+  $("working").textContent = "Working: choosing tools, reading results...";
+  try {
+    const response = await fetch("/api/v1/assistant/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail ? JSON.stringify(body.detail) : response.statusText);
+    show(body);
+  } catch (error) {
+    show({ status: "failed", segments: [], citations: [], caveats: [], calls: [],
+           errors: [String(error.message || error)] });
+  } finally {
+    $("ask").disabled = false;
+    $("working").textContent = "";
+  }
+}
+
+function show(run) {
+  $("result").classList.remove("hidden");
+  const status = $("status");
+  status.className = "status " + run.status;
+  status.textContent = run.status;
+
+  const answer = $("answer");
+  answer.replaceChildren();
+  for (const piece of run.segments || []) {
+    if (piece.value !== undefined) {
+      const c = run.citations[piece.citation];
+      answer.append(el("mark", piece.value, { title: `${c.call}: ${c.path}` }));
+    } else {
+      answer.append(document.createTextNode(piece.text));
+    }
+  }
+  if (!(run.segments || []).length && run.answer) answer.textContent = run.answer;
+
+  const errors = $("errors");
+  errors.classList.toggle("hidden", !(run.errors || []).length);
+  errors.textContent = (run.errors || []).join(" · ");
+
+  const calls = Object.fromEntries((run.calls || []).filter((c) => c.id).map((c) => [c.id, c]));
+  const evidence = $("evidence");
+  evidence.replaceChildren();
+  for (const c of run.citations || []) {
+    const tr = el("tr");
+    tr.append(el("td", c.shown));
+    tr.append(el("td", `${c.call} · ${calls[c.call] ? calls[c.call].tool : ""}`));
+    const td = el("td"); td.append(el("code", c.path)); tr.append(td);
+    evidence.append(tr);
+  }
+  if (!(run.citations || []).length) {
+    const tr = el("tr"); tr.append(el("td", "No numbers in this answer.", { colspan: "3" }));
+    evidence.append(tr);
+  }
+
+  const caveats = $("caveats");
+  caveats.replaceChildren();
+  for (const c of run.caveats || []) caveats.append(el("li", c.message));
+
+  $("trace-summary").textContent = `${(run.calls || []).length} tool call(s)`;
+  $("trace").textContent = JSON.stringify(run.calls || [], null, 2);
+  $("meta").textContent = run.model
+    ? `${run.model} · ${run.latency_ms} ms · run ${run.run_id}` : "";
+}
+</script>
+</body>
+</html>

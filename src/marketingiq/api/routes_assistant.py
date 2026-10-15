@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Engine
 
 from marketingiq.api.routes_analytics import Org
+from marketingiq.assistant.answer import REFERENCE
 from marketingiq.assistant.llm import ChatModel, ModelNotConfigured, get_chat_model
 from marketingiq.assistant.run import Run, ask
 from marketingiq.db import get_app_engine
@@ -25,9 +26,25 @@ def chat_model() -> ChatModel:
         raise HTTPException(status_code=503, detail=str(exc)) from None
 
 
+def segments(run: Run) -> list[dict[str, Any]]:
+    """The answer as text pieces and filled-in values, so a page can mark each number and
+    link it to the call it came from."""
+    rendered = run.rendered
+    if rendered is None:
+        return []
+    pieces, position = [], 0
+    for index, match in enumerate(REFERENCE.finditer(rendered.template)):
+        pieces.append({"text": rendered.template[position : match.start()]})
+        pieces.append({"value": rendered.citations[index].display, "citation": index})
+        position = match.end()
+    pieces.append({"text": rendered.template[position:]})
+    return [p for p in pieces if p.get("text") != ""]
+
+
 def present(run: Run) -> dict[str, Any]:
     rendered = run.rendered
     return {
+        "segments": segments(run),
         "run_id": str(run.id),
         "status": run.status,
         "answer": run.answer,

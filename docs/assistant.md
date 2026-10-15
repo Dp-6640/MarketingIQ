@@ -8,6 +8,18 @@ uv run python -m marketingiq.assistant "Which campaigns brought in the most qual
 
 Or `POST /api/v1/assistant/ask` with `{"question": "..."}`.
 
+## The demo page
+
+`uv run uvicorn marketingiq.api.app:app`, then open `http://127.0.0.1:8000/`.
+
+It has a question box with example questions and a banner saying the data is synthetic. Each answer comes with:
+- every filled-in number highlighted; hover to see the call and path it came from;
+- an evidence table: each value, the tool call that produced it, and its path in the result;
+- the caveats;
+- the full tool-call trace.
+
+The page is plain HTML and JavaScript ([`static/index.html`](../src/marketingiq/api/static/index.html)) with no build step. Model text is inserted as text, never as HTML.
+
 ## Setup: a free model
 
 The assistant talks to any OpenAI-compatible endpoint. The default is **Google Gemini's free tier** (`gemini-3.5-flash-lite`):

@@ -1,10 +1,11 @@
 """FastAPI application."""
 
 import logging
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,6 +16,7 @@ from marketingiq.api.routes_assistant import router as assistant_router
 from marketingiq.db import get_app_engine
 
 logger = logging.getLogger(__name__)
+DEMO_PAGE = Path(__file__).with_name("static") / "index.html"
 
 app = FastAPI(title="MarketingIQ", version=__version__)
 app.include_router(analytics_router)
@@ -25,6 +27,12 @@ app.include_router(assistant_router)
 def not_found(request: Request, exc: LookupError) -> JSONResponse:
     """An unknown organization, or one with no data or no build yet."""
     return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.get("/", include_in_schema=False)
+def demo_page() -> FileResponse:
+    """A minimal page for demonstrating the assistant (docs/assistant.md)."""
+    return FileResponse(DEMO_PAGE, media_type="text/html")
 
 
 class HealthResponse(BaseModel):

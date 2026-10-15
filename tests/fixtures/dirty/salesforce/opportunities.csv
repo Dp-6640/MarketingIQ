@@ -1,0 +1,5 @@
+Id,CreatedDate,StageName,CloseDate,IsClosed,IsWon,Amount,Amount_Basis__c,Service_Line__c
+006000000000001AAA,2026-01-10T15:00:00.000Z,Closed Won,2026-01-20,true,true,5500.00,Purchase,Furnace
+006000000000002AAA,2026-01-10T15:00:00.000Z,Closed Lost,2026-01-20,true,false,-5,Purchase,Furnace
+006000000000003AAA,2026-01-10T15:00:00.000Z,Quote Sent,2026-02-20,false,true,4000.00,Lease,Furnace
+006000000000004AAA,2026-01-10T15:00:00.000Z,Quote Sent,someday,false,false,4000.00,Lease,Furnace

@@ -1,0 +1,11 @@
+date,account_id,account_timezone,campaign_id,campaign_name,spend,impressions,inline_link_clicks,leads_reported,attribution_setting
+2026-01-05,act_1,America/Toronto,120200000000000101,Prospecting | Furnace,45.10,4000,48,1,7d_click_1d_view
+2026-01-05,act_1,America/Toronto,120200000000000102,Prospecting | AC,-3.00,1000,10,0,7d_click_1d_view
+2026-01-05,act_1,America/Toronto,120200000000000103,Prospecting | Heat Pump,20.00,100,150,0,7d_click_1d_view
+2026-02-30,act_1,America/Toronto,120200000000000101,Prospecting | Furnace,10.00,900,9,0,7d_click_1d_view
+2026-01-06,act_1,America/Toronto,,Prospecting | Furnace,10.00,900,9,0,7d_click_1d_view
+2026-01-06,act_1,America/Toronto,120200000000000104,Prospecting | Water,"12,50",900,9,0,7d_click_1d_view
+2026-01-05,act_1,America/Toronto,120200000000000101,Prospecting | Furnace,45.10,4000,48,1,7d_click_1d_view
+2026-01-05,act_1,America/Toronto,120200000000000101,Prospecting | Furnace,99.99,4000,48,1,7d_click_1d_view
+2026-01-07,act_1,America/Toronto,120200000000000101,Prospecting | Furnace,45.10,4000,48,1,7d_click_1d_view,extra
+2026-01-08,act_1,America/Toronto,120200000000000101,Prospecting | Furnace,44.90,3900,47,0,7d_click_1d_view

@@ -1,38 +1,14 @@
 import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
-from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import inspect, text
 
-from marketingiq.models import SCHEMAS, Base
-
-pytestmark = pytest.mark.integration
+from marketingiq.schema import SCHEMAS, STAGING_TABLES, metadata
 
 APP_ROLE = "miq_app"
 
-
-def _reset(engine) -> None:
-    with engine.begin() as conn:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {', '.join(SCHEMAS)} CASCADE"))
-        conn.execute(text("DROP TABLE IF EXISTS public.alembic_version"))
-
-
-@pytest.fixture
-def alembic_cfg(test_engine) -> Config:
-    cfg = Config("alembic.ini")
-    cfg.attributes["url"] = test_engine.url.render_as_string(hide_password=False)
-    cfg.attributes["app_db_role"] = APP_ROLE
-    cfg.attributes["configure_logger"] = False
-    return cfg
-
-
-@pytest.fixture
-def migrated(test_engine, alembic_cfg):
-    _reset(test_engine)
-    command.upgrade(alembic_cfg, "head")
-    yield test_engine
-    _reset(test_engine)
+pytestmark = pytest.mark.integration
 
 
 def test_upgrade_creates_schemas_and_tables(migrated):
@@ -44,6 +20,7 @@ def test_upgrade_creates_schemas_and_tables(migrated):
         "load_batches",
         "rejected_rows",
     }
+    assert set(insp.get_table_names(schema="staging")) == set(STAGING_TABLES)
 
 
 def test_downgrade_and_upgrade_round_trip(migrated, alembic_cfg):
@@ -62,7 +39,7 @@ def test_models_match_migrations(migrated):
         ctx = MigrationContext.configure(
             conn, opts={"include_schemas": True, "include_name": include_name}
         )
-        diff = compare_metadata(ctx, Base.metadata)
+        diff = compare_metadata(ctx, metadata)
 
     assert diff == []
 
@@ -77,6 +54,7 @@ def test_app_role_can_read_core_but_not_write_or_see_staging(migrated):
         assert not check("SELECT has_table_privilege(:role, 'core.organizations', 'INSERT')")
         assert not check("SELECT has_table_privilege(:role, 'core.load_batches', 'DELETE')")
         assert not check("SELECT has_schema_privilege(:role, 'staging', 'USAGE')")
+        assert not check("SELECT has_table_privilege(:role, 'staging.sf_leads', 'SELECT')")
         assert check("SELECT has_schema_privilege(:role, 'mart', 'USAGE')")
 
 

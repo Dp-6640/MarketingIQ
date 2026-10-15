@@ -1,11 +1,16 @@
 import os
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from dotenv import dotenv_values
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
 
 from marketingiq.db import make_engine
+from marketingiq.schema import SCHEMAS
+
+APP_ROLE = "miq_app"
 
 
 def _test_database_url() -> str | None:
@@ -33,3 +38,27 @@ def test_engine() -> Engine:
         _unavailable(f"Test database unreachable: {exc.orig}")
     yield engine
     engine.dispose()
+
+
+def reset_database(engine: Engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {', '.join(SCHEMAS)} CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS public.alembic_version"))
+
+
+@pytest.fixture
+def alembic_cfg(test_engine) -> Config:
+    cfg = Config("alembic.ini")
+    cfg.attributes["url"] = test_engine.url.render_as_string(hide_password=False)
+    cfg.attributes["app_db_role"] = APP_ROLE
+    cfg.attributes["configure_logger"] = False
+    return cfg
+
+
+@pytest.fixture
+def migrated(test_engine, alembic_cfg):
+    """The test database, wiped and migrated to the latest revision."""
+    reset_database(test_engine)
+    command.upgrade(alembic_cfg, "head")
+    yield test_engine
+    reset_database(test_engine)

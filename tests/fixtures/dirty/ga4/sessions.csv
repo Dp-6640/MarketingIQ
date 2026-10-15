@@ -1,0 +1,8 @@
+user_pseudo_id,ga_session_id,session_start_utc,source,medium,campaign,content,landing_page,device_category,has_gclid,has_fbclid,ev_quote_submit,ev_callback_submit,ev_phone_click,ev_chat_start,ev_booking_click
+1234567890.1767600000,1767607200,2026-01-05T10:00:00Z,google,organic,(organic),,/heating/furnaces/,mobile,false,false,0,0,0,0,0
+1234567891.1767600000,1767607201,2026-01-05 10:00:00,google,organic,(organic),,/,mobile,false,false,0,0,0,0,0
+1234567892.1767600000,1767607202,2026-01-05T10:00:02Z,google,cpc,search_generic,,/,mobile,maybe,false,0,0,0,0,0
+1234567893.1767600000,1767607203,2026-01-05T10:00:03Z,(direct),(none),(direct),,/,desktop,false,false,-1,0,0,0,0
+,1767607204,2026-01-05T10:00:04Z,(direct),(none),(direct),,/,desktop,false,false,0,0,0,0,0
+1234567895.1767600000,abc,2026-01-05T10:00:05Z,(direct),(none),(direct),,/,desktop,false,false,0,0,0,0,0
+1234567890.1767600000,1767693600,2026-01-06T10:00:00Z,facebook,paid_social,meta_prospecting_furnace,ad_a,/offers/furnace/,mobile,false,true,1,0,0,0,0

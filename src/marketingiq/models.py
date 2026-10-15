@@ -98,6 +98,7 @@ class LoadBatch(Base):
     rows_duplicate: Mapped[int] = mapped_column(Integer, server_default="0")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error: Mapped[str | None] = mapped_column(Text)  # why a failed load failed
 
 
 class RejectedRow(Base):

@@ -1,0 +1,8 @@
+Id,CreatedDate,LeadSource,Status,IsConverted,ConvertedDate,ConvertedOpportunityId,City,Entry_Point__c,Request_Type__c,Existing_Customer__c,Service_Line__c,Form_Page_Path__c,UTM_Source__c,UTM_Medium__c,UTM_Campaign__c,Click_Id_Type__c,GA_Client_Id__c,Meta_Campaign_Id__c,Person_Key__c,Qualified_Date__c,Is_Test__c
+00Q000000000001EAA,2026-01-05T15:00:00.000Z,Web,Qualified,false,,,Toronto,Quote Form,,,,/heating/furnaces/,,,,,1234567890.1767600000,,aaaaaaaaaaaaaaaa,2026-01-06T15:00:00.000Z,false
+,2026-01-05T15:00:00.000Z,Web,New,false,,,Toronto,Quote Form,,,,,,,,,,,bbbbbbbbbbbbbbbb,,false
+00Q000000000003EAA,yesterday,Web,New,false,,,Toronto,Quote Form,,,,,,,,,,,cccccccccccccccc,,false
+00Q000000000004EAA,2026-01-05T15:00:00.000Z,Web,Converted,true,2026-01-10,,Toronto,Quote Form,,,,,,,,,,,dddddddddddddddd,,false
+123,2026-01-05T15:00:00.000Z,Phone,New,false,,,Ottawa,Phone,Installation,No,Furnace,,,,,,,,eeeeeeeeeeeeeeee,,false
+00Q000000000006EAA,2026-01-05T15:00:00.000Z,Web,Converted,true,2026-13-01,006000000000001AAA, Kenora ,Callback Form,Installation,No,,,,,,,,,ffffffffffffffff,,false
+00Q000000000007EAA,2026-01-05T16:00:00.000Z,Web,Converted,true,2026-01-12,006000000000001AAA,Mississauga ON,Quote Form,,,,/offers/furnace/,facebook,paid_social,meta_prospecting_furnace,fbclid,,,1111111111111111,2026-01-06T16:00:00.000Z,false

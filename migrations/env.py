@@ -11,14 +11,14 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from marketingiq.config import get_settings
-from marketingiq.models import SCHEMAS, Base
+from marketingiq.schema import SCHEMAS, metadata
 
 config = context.config
 
 if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-target_metadata = Base.metadata
+target_metadata = metadata
 
 if "app_db_role" not in config.attributes:
     config.attributes["app_db_role"] = get_settings().app_db_role

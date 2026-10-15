@@ -8,7 +8,7 @@ import numpy as np
 
 from synthetic.config import WEB_ENTRY_POINTS, CampaignConfig, parse_month_day
 from synthetic.context import Context
-from synthetic.entities import Household, MetaDay, Session
+from synthetic.entities import Household, Lead, MetaDay, Session
 from synthetic.rng import stable_int
 from synthetic.traffic import (
     META_NATIVE,
@@ -304,3 +304,49 @@ def _ad_click_visit(
         campaign=campaign.key,
         service_line=service,
     )
+
+
+def report_meta_leads(ctx: Context, meta_days: list[MetaDay], leads: list[Lead]) -> None:
+    """Leads as Meta Ads Manager would report them (scenario S07).
+
+    Each lead form or Messenger lead counts for its campaign. A website lead counts for every
+    Meta campaign the visitor clicked in the click window, if the pixel could see them
+    (cookie consent); duplicates count again. View-through claims add more on top. None of
+    this is de-duplicated against the CRM, so the totals run above CRM lead counts.
+    """
+    calendar = ctx.calendar
+    click_window = timedelta(days=ctx.config.meta_account.click_window_days)
+    rows = {(row.campaign, row.day): row for row in meta_days}
+    for lead in leads:
+        household = lead.household
+        if household is None:
+            continue
+        if lead.entry_point in ("meta_lead_form", "meta_messaging_agent"):
+            credited = [household.origin_campaign] if household.origin_campaign else []
+        elif lead.entry_point in WEB_ENTRY_POINTS and household.consent:
+            credited = sorted(
+                {
+                    s.campaign
+                    for s in household.sessions
+                    if s.channel == "meta"
+                    and s.campaign is not None
+                    and lead.created_at - click_window <= s.start <= lead.created_at
+                }
+            )
+        else:
+            continue
+        day = calendar.local_date(lead.created_at, ctx.meta_tz)
+        for campaign in credited:
+            row = rows.get((campaign, day))
+            if row is not None:
+                row.reported_leads += 1
+
+    view_through = ctx.config.meta_account.view_through_rate
+    for row in meta_days:
+        if not row.reported_leads or ctx.campaigns[row.campaign].tactic in (
+            "lead_form",
+            "messaging",
+        ):
+            continue
+        rng = ctx.streams.rng("meta_view_through", stable_int(row.campaign), row.day.toordinal())
+        row.reported_leads += int(rng.poisson(view_through * row.reported_leads))

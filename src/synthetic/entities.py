@@ -57,6 +57,47 @@ class Household:
 
 
 @dataclass(slots=True, eq=False)
+class Appointment:
+    kind: str  # in_home_consultation | service_visit
+    booked_at: datetime
+    scheduled_for: datetime
+    outcome: str  # completed | no_show | cancelled (as it eventually turns out)
+    sf_id: str = ""
+
+
+@dataclass(slots=True, eq=False)
+class Opportunity:
+    created_at: datetime
+    close_at: datetime  # when it will be won or lost; may be after data_as_of (still open)
+    won: bool
+    amount: float
+    amount_basis: str
+    service_line: str
+    sf_id: str = ""
+
+
+@dataclass(slots=True, eq=False)
+class Lead:
+    """One CRM lead record, with what really happened to it afterwards."""
+
+    key: tuple[int, ...]  # random-stream key
+    household: Household | None  # None for test leads
+    created_at: datetime
+    entry_point: str
+    request: str
+    true_class: str  # acquisition, existing_customer_sales, service_demand, non_marketing, junk
+    duplicate_of: "Lead | None" = None
+    is_test: bool = False
+    resubmission: bool = False
+    status: str = "New"  # Salesforce-style status as of data_as_of
+    decided_at: datetime | None = None
+    qualified_at: datetime | None = None
+    appointment: Appointment | None = None
+    opportunity: Opportunity | None = None
+    sf_id: str = ""
+
+
+@dataclass(slots=True, eq=False)
 class MetaDay:
     """One campaign on one day of the ad account's time zone."""
 

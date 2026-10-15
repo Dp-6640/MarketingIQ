@@ -148,12 +148,25 @@ def render(draft: SubmitAnswer, results: dict[str, dict]) -> Rendered:
         if call not in results:
             rendered.errors.append(f"{match[0]}: there is no call {call}")
             return match[0]
-        if path.startswith("result."):
-            path = path.removeprefix("result.")  # copied from the tool-message wrapper
+        # A prefix copied from the tool-message wrapper ("result.", "results[0].") is dropped.
+        path = re.sub(r"^results?(?:\[\d+\])?\.", "", path)
         context = (results[call].get("metric") or {}).get("unit")
         try:
             value, display = _cell(walk(results[call], path), path, context)
-        except (Missing, ValueError) as exc:
+        except Missing as exc:
+            parent, _, last = path.rpartition(".")
+            try:
+                cell = walk(results[call], parent) if parent else None
+            except (Missing, ValueError):
+                cell = None
+            hidden = isinstance(cell, dict) and cell.get("previous_suppressed")
+            if hidden and last in ("previous", "change", "change_pct"):
+                display = "hidden (fewer than 5)"
+                rendered.citations.append(Citation(match[0], call, path, None, display))
+                return display
+            rendered.errors.append(f"{match[0]}: {exc}")
+            return match[0]
+        except ValueError as exc:
             rendered.errors.append(f"{match[0]}: {exc}")
             return match[0]
         rendered.citations.append(Citation(match[0], call, path, value, display))

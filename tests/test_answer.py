@@ -106,3 +106,26 @@ def test_provider_fields_on_a_tool_call_are_sent_back_unchanged():
 
     assert sent["extra_content"] == signature["extra_content"]
     assert sent["function"] == {"name": "get_performance", "arguments": "{}"}
+
+
+def test_a_hidden_previous_value_renders_as_hidden():
+    results = {
+        "c1": {
+            "rows": [{"key": "a", "values": {"leads": {"value": 0, "previous_suppressed": True}}}]
+        }
+    }
+
+    rendered = render(
+        SubmitAnswer(status="answered", answer="From {{c1:rows[0].values.leads.previous}}."),
+        results,
+    )
+
+    assert rendered.errors == [] and rendered.text == "From hidden (fewer than 5)."
+
+
+def test_a_copied_wrapper_prefix_is_ignored():
+    rendered = render(
+        SubmitAnswer(status="answered", answer="{{c1:results[0].totals.spend}}"), RESULTS
+    )
+
+    assert rendered.errors == [] and rendered.text == "$12,345.60"

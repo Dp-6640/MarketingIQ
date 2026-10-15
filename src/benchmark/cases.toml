@@ -272,14 +272,15 @@ scenario = "S04"
 question = "Which campaigns spent more in March 2026 than in February while bringing in fewer qualified leads?"
 kind = "answer"
 calls = [
-  { tool = "explain_metric_change", args = { metric = "cost_per_qualified_lead", dimension = "campaign", period = { preset = "custom", start = "2026-03-01", end = "2026-03-31" } } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2026-03-01", end = "2026-03-31" }, compare_to = "previous_period", group_by = ["campaign"], metrics = ["spend", "qualified_leads"] } },
 ]
-warnings = ["small_cell_suppressed"]
-facts = ["0:segments{key=meta_prospecting_heatpump}.direction", "0:segments{key=meta_prospecting_heatpump}.numerator"]
+warnings = ["seasonal_comparison", "small_cell_suppressed"]
+facts = ["0:rows{key=meta_retargeting_all}.values.spend.value", "0:rows{key=meta_retargeting_all}.values.spend.previous", "0:rows{key=meta_retargeting_all}.values.qualified_leads.value", "0:rows{key=meta_retargeting_all}.values.qualified_leads.previous"]
 expect = [
-  { path = "0:segments{key=meta_prospecting_heatpump}.direction", op = "equals", value = "spend_up_paid_qualified_leads_flat" },
+  { path = "0:rows{key=meta_retargeting_all}.values.spend.change", op = "gt", value = 0 },
+  { path = "0:rows{key=meta_retargeting_all}.values.qualified_leads.change", op = "lt", value = 0 },
 ]
-notes = "The honest answer: no visible campaign matches. Heat-pump spend rose about 37% but the campaign is credited with no qualified leads in either month, and the rest are hidden as small counts. S04's planted quality drop is invisible in attributed data (docs/benchmark.md)."
+notes = "Retargeting spent more with fewer qualified leads. The first answer key said no campaign matched, because explain_metric_change hides the retargeting row by secondary suppression; a model found it through get_performance (docs/benchmark.md). Heat pump, the planted S04 campaign, has no credited qualified leads in either month, so its quality drop can't be seen."
 
 [[case]]
 id = "Q19"
@@ -292,7 +293,7 @@ calls = [
   { tool = "get_performance", args = { period = { preset = "custom", start = "2026-05-12", end = "2026-06-10" }, compare_to = "custom", comparison = { preset = "custom", start = "2026-04-12", end = "2026-05-11" }, group_by = ["landing_page_type"], metrics = ["sessions", "form_submit_rate"] } },
 ]
 warnings = ["change_within_noise"]
-facts = ["0:annotations[0]", "1:rows{key=location}.values.sessions.value", "1:rows{key=location}.values.form_submit_rate"]
+facts = ["0:annotations[0].start_date", "1:rows{key=location}.values.form_submit_rate.change_significant"]
 expect = [
   { path = "0:annotations[0].start_date", op = "equals", value = "2026-05-12" },
   { path = "1:rows{key=location}.values.form_submit_rate.change_significant", op = "equals", value = false },
@@ -316,7 +317,7 @@ facts = ["0:rows{key=acquisition}.values.leads.value", "0:rows{key=service_deman
 id = "Q21"
 covers = "question-tool-map #21"
 scenario = "S03"
-question = "During the February 2026 cold snap, did service calls rise more than new-customer leads?"
+question = "During the February 2026 cold snap, did service calls rise more than new-customer leads, compared with the days just before it?"
 kind = "answer"
 calls = [
   { tool = "list_annotations", args = { annotation_type = "cold_snap", start = "2026-02-01", end = "2026-02-28" } },

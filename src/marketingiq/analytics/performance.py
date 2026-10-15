@@ -531,12 +531,19 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
     base_rows = [current.rows.get(key, dict.fromkeys(current.totals, Decimal(0))) for key in keys]
     hidden = suppressed_bases(base_rows)
     total_hidden = suppressed_bases([current.totals])[0]
-    if any(hidden) or total_hidden:
+    # The comparison period's small counts are hidden too: "fell from 1 to 0" reveals a 1.
+    if prior:
+        prior_rows = [prior.rows.get(key, dict.fromkeys(prior.totals, Decimal(0))) for key in keys]
+        hidden_before = suppressed_bases(prior_rows)
+        total_hidden_before = suppressed_bases([prior.totals])[0]
+    else:
+        hidden_before, total_hidden_before = [set() for _ in keys], set()
+    if any(hidden) or total_hidden or any(hidden_before) or total_hidden_before:
         warnings.append(warning("small_cell_suppressed"))
 
     noisy = []
 
-    def values_for(base_values, prior_values, hidden_bases) -> dict[str, dict]:
+    def values_for(base_values, prior_values, hidden_bases, hidden_prior) -> dict[str, dict]:
         result = {}
         for name in query.metrics:
             metric = METRICS[name]
@@ -547,7 +554,9 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
                 cell = {"value": None, "suppressed": True}
             if prior_values is not None and not cell.get("suppressed"):
                 before = _value(name, prior_values, prior, query)  # type: ignore[arg-type]
-                if before.get("value") is not None:
+                if before.get("value") is not None and hidden_prior & set(metric.bases):
+                    cell["previous_suppressed"] = True
+                elif before.get("value") is not None:
                     cell["previous"] = before["value"]
                     if cell.get("value") is not None:
                         cell["change"] = cell["value"] - before["value"]
@@ -570,7 +579,9 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
     flag_results = {
         name: _flag(name, keys, base_values=base_rows, hidden=hidden) for name in query.flags
     }
-    for key, base_values, hidden_bases in zip(keys, base_rows, hidden, strict=True):
+    for key, base_values, hidden_bases, hidden_prior in zip(
+        keys, base_rows, hidden, hidden_before, strict=True
+    ):
         prior_values = (
             prior.rows.get(key, dict.fromkeys(prior.totals, Decimal(0))) if prior else None
         )
@@ -580,13 +591,15 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
                 "key": "|".join(str(part) for part in key),
                 "dimensions": dimensions,
                 "labels": {d: label(ctx, d, v) for d, v in dimensions.items()},
-                "values": values_for(base_values, prior_values, hidden_bases),
+                "values": values_for(base_values, prior_values, hidden_bases, hidden_prior),
             }
         )
         if query.flags:
             rows[-1]["flags"] = [name for name in query.flags if key in flag_results[name]["keys"]]
     _rank(rows, query.metrics)
-    totals = values_for(current.totals, prior.totals if prior else None, total_hidden)
+    totals = values_for(
+        current.totals, prior.totals if prior else None, total_hidden, total_hidden_before
+    )
     if any(noisy):
         warnings.append(warning("change_within_noise"))
     if query.sort_by:

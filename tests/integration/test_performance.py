@@ -267,3 +267,19 @@ def test_groups_without_a_spend_feed_have_no_spend_not_zero(app_engine):
         assert values["spend"] == {"value": None, "null_reason": "no_spend_source"}
         assert values["ctr"]["null_reason"] == "no_spend_source"
     assert row(result, "meta")["spend"]["value"] > 0
+
+
+def test_small_counts_in_the_comparison_period_are_hidden_too(app_engine):
+    march = {"preset": "custom", "start": "2026-03-01", "end": "2026-03-31"}
+    result = perf(
+        app_engine,
+        period=march,
+        compare_to="previous_period",
+        group_by=["campaign"],
+        metrics=["qualified_leads"],
+    )
+
+    for r in result["rows"]:
+        cell = r["values"]["qualified_leads"]
+        assert "previous" not in cell or not 0 < cell["previous"] < 5, r["key"]
+    assert any(r["values"]["qualified_leads"].get("previous_suppressed") for r in result["rows"])

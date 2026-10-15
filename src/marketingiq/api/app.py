@@ -3,17 +3,26 @@
 import logging
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, Response, status
+from fastapi import Depends, FastAPI, Request, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from marketingiq import __version__
+from marketingiq.api.routes_analytics import router as analytics_router
 from marketingiq.db import get_app_engine
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MarketingIQ", version=__version__)
+app.include_router(analytics_router)
+
+
+@app.exception_handler(LookupError)
+def not_found(request: Request, exc: LookupError) -> JSONResponse:
+    """An unknown organization, or one with no data or no build yet."""
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 class HealthResponse(BaseModel):

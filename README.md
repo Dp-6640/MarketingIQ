@@ -42,7 +42,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and PostgreSQL 18 (16+ should wor
    uv run ruff check . && uv run ruff format --check .
    ```
 
-4. Run the API: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127.0.0.1:8000/health`.
+4. Run the API: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127.0.0.1:8000/health`. Interactive API docs are at `/docs`; see `docs/analytics-api.md`.
 5. Generate synthetic data: `uv run python -m synthetic generate` writes a fictional 24-month dataset to `data/synthetic/` (ignored by git). See `docs/synthetic-data.md`.
 6. Load it into staging: `uv run alembic upgrade head`, then `uv run python -m marketingiq.ingest load data/synthetic/default-seed-20261014`. See `docs/loading.md`.
 7. Build the core model: `uv run python -m marketingiq.core build --org synthetic-home-services`. See `docs/core-model.md`.

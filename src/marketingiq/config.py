@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     test_database_url: str | None = None
     # Role that migrations grant read access to (must match the role in DATABASE_URL_APP).
     app_db_role: str = "miq_app"
+    # Organization the API serves when a request doesn't name one (one org in the MVP).
+    default_org_slug: str = "synthetic-home-services"
 
     @property
     def app_url(self) -> str:

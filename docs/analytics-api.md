@@ -1,0 +1,77 @@
+# Analytics Services and REST API
+
+Every number MarketingIQ shows comes from one of six services in `src/marketingiq/analytics/`.
+The REST API is a thin layer over them, and the assistant (Phase 4) will call the same services
+as tools. A query is the same Pydantic model in all three places, so it means the same thing
+everywhere. All read paths use the read-only `miq_app` role.
+
+Run it: `uv run uvicorn marketingiq.api.app:app --reload`, then open `http://127.0.0.1:8000/docs`.
+
+## Endpoints
+
+| Method and path | Service | Answers |
+|---|---|---|
+| `GET /health` | – | Is the API up, and can it reach the database? |
+| `GET /api/v1/campaigns?search=` | – | Which campaign key is "the furnace campaign"? |
+| `GET /api/v1/annotations?start=&end=&annotation_type=` | – | What happened in the business around these dates? |
+| `POST /api/v1/analytics/performance` | `get_performance` | Any registry metric, by up to two dimensions, with a comparison |
+| `POST /api/v1/analytics/funnel` | `get_lead_funnel` | Leads → contacted → booked → qualified → opportunity → won, with stage rates |
+| `POST /api/v1/analytics/reconciliation` | `get_source_reconciliation` | GA4 vs Meta-reported vs CRM, side by side and never added together |
+| `POST /api/v1/analytics/change` | `explain_metric_change` | Which segments moved a metric between two periods |
+| `POST /api/v1/analytics/data-quality` | `get_data_quality` | What can't be trusted about this period, and why |
+
+Every request takes an optional `?org=<slug>`. Without it, the API uses `DEFAULT_ORG_SLUG`
+(default `synthetic-home-services`).
+
+## Error behaviour
+
+- **422**: the query is invalid before any SQL runs. Examples: an unknown metric, a field that
+  isn't in the model (so there is no way to send free-text SQL), spend split by a lead
+  property, or a custom comparison with no comparison period.
+- **404**: the organization doesn't exist, has no data loaded, or has no core build yet.
+- **503** from `/health`: the database is unreachable. Connection details go to the log only.
+
+## What every analytics result contains
+
+- `resolved`: the exact period and comparison dates, population, attribution model, lookback,
+  time zone, currency, `data_as_of` and `synthetic`. "Last month" is never left for the reader
+  to guess.
+- Values, with a `null_reason` instead of a misleading 0, and `suppressed: true` for cells
+  under the small-cell threshold (k = 5).
+- `warnings`: caveat codes with plain-English messages (see `docs/metrics.md`).
+
+## The four reports, briefly
+
+**Funnel.** Stage counts over lead properties, plus stage-to-stage rates. Leads are counted by
+creation date, so recent cohorts look worse until they mature, and a maturity warning says so.
+A funnel can be split by one dimension.
+
+**Reconciliation.** Puts three sources next to each other for one period: GA4 key events, Meta's
+platform-reported conversions (including view-through) and CRM leads by evidence tier. The
+three are not additive, and the report says so every time with `sources_not_additive`. On the
+synthetic data Meta reports about 1.2× the CRM leads that carry Meta evidence (scenario S07).
+That gap is expected, not an error.
+
+**Change explanation.** For a count metric, each segment's effect is its own change, and the
+effects add up exactly to the total change (`share_of_change`). For a ratio (cost per lead,
+booking rate), each segment's effect is the actual total minus the total there would have been
+if only that segment had kept its previous numerator and denominator. Ratio effects don't add
+up exactly, and the `method` field says so. Labels such as `spend_up_paid_leads_down` spare a
+caller from comparing signs. These are arithmetic contributions, not causes.
+
+**Data quality.** Evidence-tier coverage, classification defaults, unmapped campaigns, channels
+with leads but no spend feed, hidden-field capture by week, days without data per source,
+latest loads and their rejections, cohort maturity and time zones. A week's capture rate below
+half the median weekly rate is flagged as `capture_drop`, which means tracking broke, not that
+customers disappeared. Synthetic scenario S06 plants exactly this.
+
+## Known trade-off: suppression at this scale
+
+With k = 5, many campaign × month cells in a change explanation are hidden at this business's
+volume, especially for qualified leads and sales. That is deliberate (privacy before detail),
+but it means a manager may see "suppressed" where they expect a number. The options, to decide
+once real volumes are known (U-15):
+
+1. Keep k = 5 and explain at a coarser level (channel instead of campaign).
+2. Lower k for aggregated, non-identifying metrics such as spend. Spend is not about people.
+3. Widen the default period for ratio explanations.

@@ -1,16 +1,13 @@
 """The performance service, checked against direct SQL and the source files (tiny world)."""
 
 import csv
-import os
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from dotenv import dotenv_values
 from pydantic import ValidationError
 from sqlalchemy import text
-from sqlalchemy.engine import make_url
 
 from marketingiq.analytics.performance import (
     PerformanceQuery,
@@ -20,7 +17,6 @@ from marketingiq.analytics.performance import (
 )
 from marketingiq.analytics.periods import Period, PeriodSpec
 from marketingiq.core.build import build_core
-from marketingiq.db import make_engine
 from marketingiq.ingest.loader import load_dataset
 from synthetic.export import generate
 
@@ -40,16 +36,8 @@ def world(migrated_module, tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def app_engine(world):
-    """The read-only app role, on the test database: analytics must work without writes."""
-    app_url = os.environ.get("DATABASE_URL_APP") or dotenv_values(".env").get("DATABASE_URL_APP")
-    if not app_url:
-        pytest.skip("DATABASE_URL_APP is not set")
-    owner = world[0].url
-    app = make_url(app_url)
-    engine = make_engine(owner.set(username=app.username, password=app.password))
-    yield engine
-    engine.dispose()
+def app_engine(world, app_role_engine):
+    return app_role_engine(world[0])
 
 
 def perf(engine, **query) -> dict:

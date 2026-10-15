@@ -5,6 +5,7 @@ from alembic import command
 from alembic.config import Config
 from dotenv import dotenv_values
 from sqlalchemy import Engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 
 from marketingiq.db import make_engine
@@ -71,3 +72,21 @@ def migrated_module(test_engine, alembic_cfg):
     command.upgrade(alembic_cfg, "head")
     yield test_engine
     reset_database(test_engine)
+
+
+@pytest.fixture(scope="session")
+def app_role_engine():
+    """Makes engines for the read-only app role on the test database (read paths need no writes)."""
+    app_url = os.environ.get("DATABASE_URL_APP") or dotenv_values(".env").get("DATABASE_URL_APP")
+    if not app_url:
+        _unavailable("DATABASE_URL_APP is not set")
+    app = make_url(app_url)
+    engines = []
+
+    def make(owner: Engine) -> Engine:
+        engines.append(make_engine(owner.url.set(username=app.username, password=app.password)))
+        return engines[-1]
+
+    yield make
+    for engine in engines:
+        engine.dispose()

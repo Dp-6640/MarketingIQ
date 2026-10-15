@@ -73,8 +73,45 @@ A case passes on kind, all facts obtained, caveats and no forbidden phrases. Cit
 
 `--delay` spaces the cases out to stay under free-tier per-minute limits.
 
+## Results: Gemini 3.5 Flash-Lite (free tier), 2026-10-15
+
+| Run | Passed | What changed before it |
+|---|---|---|
+| 1 | 11 of 32 | (baseline) 9 of the 21 failures were the free tier's 15 requests a minute, not the model |
+| 2 | 18 of 32 | Request pacing and 429 handling; prompt rules for periods, units, statuses; unit-aware formatting; wider seasonal caveat; scorer: facts only required for answers and clarifications |
+| 3 | 22 of 32 | App fix: no spend shown as $0; prompt: `value` vs `previous`; scorer: a fact counts if the answer cites it from any tool; three answer-key corrections |
+| 3b | 4 of 6 rerun | Privacy fix (previous-period small counts); two more answer-key corrections. Not a full run, so no new total is claimed. |
+
+Reports for every run are in `benchmark/runs/`. Each changed case is explained in the commit messages (`903facf`, `346c6c0`, `ee8cdf9`).
+
+### What the model found that the tests didn't
+
+Running a real model found three bugs that 300 deterministic tests had missed. Each was a value the tools returned that a careful reader would misuse:
+
+1. **No spend feed shown as $0.** Google Ads, email and the no-campaign group got spend 0, and were ranked on it. The model reported "Google Ads recorded $0.00 in spend". Spend is now unavailable (`no_spend_source`) for groups without a feed.
+2. **A comparison period's small counts weren't hidden.** "Qualified leads fell from 1 to 0" revealed a count of 1. Previous-period values built from counts under 5 are now hidden too.
+3. **An answer key was wrong.** For Q18, explain_metric_change hides the retargeting row through secondary suppression, so the key said no campaign matched. The model found the match (spend up, qualified leads 14 to 8) through get_performance. That also shows a privacy gap that remains open: **suppression is decided per query**, so a cell one tool hides can be visible in another (a differencing risk). Consistent suppression across tools is part of the R0 privacy review.
+
+### What numbers by reference does and doesn't guarantee
+
+Across all runs, no answer contained a number that didn't come from a tool. The answer contract made that impossible, and it rejected answers that tried (Q05, Q16, Q22). But one run told a change backwards: "fell from $319.81 to $246.97" when March was the $319.81. **References guarantee real numbers, not a correct reading of them.** That is why ranks, flags, direction labels and significance are computed by the tools, and why the benchmark checks facts and not only grounding.
+
+### Remaining failures (run 3)
+
+- **Path errors on deeply nested results** (Q16): Flash-Lite invents `results[0].` prefixes and nesting on the data-quality result. A larger model, or flatter data-quality output, would help.
+- **Incomplete answers**: correct as far as they go, but missing a fact the question needs (Q04: the most expensive campaign; Q12, Q13: the journey share).
+- **Q10** (immature cohorts) gave a muddled answer.
+- **Q19** compared all pages instead of location pages in one run.
+
+### Caveats on these numbers
+
+- **The score was improved on the same 32 questions it measures.** Each change was a general rule or a corrected answer key, not a special case, but the score still flatters the assistant. Before quoting it, run a held-out set: new questions written after this tuning and never used to tune.
+- **One model, one run per round, temperature 0.** Results still vary between runs: Q05 and Q10 passed in run 1 and failed later, and none of the changes in between explains why. A score should be an average over several runs.
+- **Synthetic data.** The benchmark shows the system behaves as designed on a fictional business, not that it is accurate on real data.
+
 ## Not yet covered
 
+- **A held-out set:** questions written after tuning, to measure the assistant without the tuning bias above.
 - **Prompt injection:** a campaign name containing an instruction, which the answer must treat as data. It needs a dataset with such a name; it comes with the Phase 4 harness.
 - **Multi-turn clarification:** cases are single-turn; R06 checks only that the assistant asks.
 - **V1 questions** 24–25 (Clarity).

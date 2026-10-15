@@ -45,7 +45,7 @@ flowchart LR
     classDef planned fill:#fff,stroke:#9ca3af
 ```
 
-Numbers flow from files to answers; the LLM never computes them. Everything shown now exists. Next is the first scored run with a real model. The benchmark was written before the assistant, so it judges the assistant without being shaped by it. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
+Numbers flow from files to answers; the LLM never computes them. Everything shown now exists and has been through three scored runs with a real model (22 of 32 at last count). The benchmark was written before the assistant, so it judges the assistant without being shaped by it. Ground truth never enters the database: it goes straight to the tests. The oracle reads the same files independently and checks the analytics' numbers.
 
 ### Progress log
 
@@ -53,6 +53,11 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-10-15 | `ee8cdf9` | Privacy fix from run 3: hide small previous-period counts |
+| 2026-10-15 | `346c6c0` | Fixes from run 2, including no-spend-feed shown as $0 |
+| 2026-10-15 | `903facf` | Fixes from run 1: pacing, periods, formatting, statuses |
+| 2026-10-15 | `818fa0f` | Send Gemini's thought signatures back |
+| 2026-10-15 | `b2cae4a` | Journal: step 12, the assistant |
 | 2026-10-15 | `457e454` | Demo page: ask, see where every number came from |
 | 2026-10-15 | `a567118` | Benchmark scoring: run the assistant through every case |
 | 2026-10-15 | `015224b` | The assistant: any OpenAI-compatible model, numbers by reference |
@@ -413,6 +418,29 @@ After the fixes, the two implementations agree everywhere: 26 tests on the tiny 
 
 **Interview line:** "The model never writes a number. It writes references into tool results and the backend fills them in, so a fabricated number is structurally impossible and every figure is traceable to a logged tool call. I proved the benchmark scorer with a reference agent that passes 32 of 32 before pointing it at a real model."
 
+## Step 13: the first real evaluation
+
+**What we did** (`818fa0f`, `903facf`, `346c6c0`, `ee8cdf9`): we connected the assistant to Gemini 3.5 Flash-Lite on the free tier and ran the 32-case benchmark three times. Between runs we fixed what each run revealed. The score went from **11 to 18 to 22 of 32**, and a partial rerun of six cases passed four. Full write-up: `docs/benchmark.md`, section "Results".
+
+**What happened, in order:**
+
+1. **The first request failed:** Gemini needs a "thought signature" it attaches to each tool call to be sent back. The adapter now returns any provider-specific fields unchanged.
+2. **Run 1 (11/32):** 9 failures were the free tier's 15-requests-a-minute limit. The adapter now paces requests and waits out a 429. The model's real mistakes were mostly about periods (no default, no "last 12 months" preset) and formatting.
+3. **Run 2 (18/32):** the model reported "Google Ads recorded $0.00 in spend". That was **our bug**: groups with no spend feed got spend 0. Fixed. It also told a change backwards, so the prompt now spells out `value` vs `previous`.
+4. **Run 3 (22/32):** the model wrote "qualified leads fell from 1 to 0". That was **a privacy bug**: small counts were hidden in the current period but not in the comparison period. Fixed. It also found a correct answer our key had missed (Q18), which exposed that two tools can hide the same cell differently.
+
+**Why it went this way:**
+
+- **Separate the system's failures from the model's.** Before blaming the model, each failure was sorted: infrastructure (rate limits), our bugs, prompt gaps, scorer or answer-key errors, or genuine model mistakes. About half of the early "model failures" weren't the model's.
+- **A real model is a new kind of test.** 300 deterministic tests passed while two real bugs sat in the data the tools returned. A model reads results the way a person would, so it trips over values that are technically valid but misleading.
+- **Know when to stop tuning.** Every fix was a general rule or a corrected answer key, but fixing things on the same 32 questions still inflates the score. The honest next measurement is a held-out set the tuning never saw.
+
+**The lesson in one line:** numbers by reference made fabricated numbers impossible, and none appeared in any run. But one answer read real numbers backwards. Grounding guarantees the numbers are real, not that they're read correctly.
+
+**Concepts:** evaluation-driven development, error analysis (sorting failures by cause), rate limits and backoff, overfitting to a benchmark, held-out sets, differencing attacks on suppressed data, run-to-run variance.
+
+**Interview line:** "The first real run scored 11 of 32. I sorted every failure by cause, not just by score. Half were infrastructure or my own bugs, including a privacy leak in comparison periods and a 'no spend feed' shown as zero spend, which the model surfaced and 300 unit tests hadn't. After three rounds it scores 22 of 32. I stopped there, because more tuning on the same questions would only make the number less honest; a held-out set is next."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -475,6 +503,11 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | Prompt injection | Text inside data (a campaign name, a web page) that tries to give the model instructions | The prompt's last rule |
 | Test double | A stand-in for a real dependency in tests, here a scripted model | ScriptedModel |
 | Free tier | Free API access with rate limits, and often looser data terms: fine for fictional data only | U-14 |
+| Error analysis | Reading failures one by one and sorting them by cause before fixing anything | docs/benchmark.md, Results |
+| Overfitting to a benchmark | Improving a score by tuning on the same questions it measures, so it stops reflecting real ability | Why the tuning stopped |
+| Held-out set | Questions kept aside and never used for tuning, so they measure honestly | Next step |
+| Differencing attack | Recovering a hidden number by comparing results that hide different cells | Cross-tool suppression gap |
+| Backoff | Waiting before retrying a rate-limited request, ideally as long as the server asks | The model adapter |
 
 ## Interview talking points
 
@@ -502,5 +535,5 @@ These questions involve no company data, only how the systems are set up. Each a
 - [ ] Can the project use the company's name, or be shown publicly? Check your employment agreement and ask your manager. (U-23)
 - [ ] Is there a separate form for nominations, or do they come through the quote form? (U-20; they currently count as acquisition leads)
 - [ ] How many leads a month does each campaign really get? That decides whether hiding counts under 5 leaves useful campaign-level answers (U-15)
-- [ ] Create a free Gemini API key at aistudio.google.com/apikey and add `LLM_API_KEY=` to `.env`, then run `uv run python -m benchmark run --delay 5`
+- [x] Create a free Gemini API key and run the benchmark (done 2026-10-15: 22 of 32)
 - [ ] Does the performance marketing manager agree with the rule for "cheap leads that rarely qualify": cost per lead and qualification rate both below the median, among campaigns with at least 10 leads? (question 6)

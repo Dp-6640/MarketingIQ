@@ -162,6 +162,14 @@ METRICS: dict[str, Metric] = {
             "leads",
         ),
         _ratio(
+            "consultation_booking_rate",
+            "Consultation booking rate",
+            "rate",
+            "Consultations booked / qualified leads, same cohort.",
+            "consultations_booked",
+            "qualified_leads",
+        ),
+        _ratio(
             "consultation_completion_rate",
             "Consultation completion rate",
             "rate",
@@ -262,6 +270,7 @@ MetricName = Literal[
     "form_submit_rate",
     "lead_conversion_rate",
     "qualification_rate",
+    "consultation_booking_rate",
     "consultation_completion_rate",
     "win_rate",
     "lead_to_sale_rate",

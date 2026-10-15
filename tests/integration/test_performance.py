@@ -14,9 +14,9 @@ from sqlalchemy.engine import make_url
 
 from marketingiq.analytics.performance import (
     PerformanceQuery,
-    _measure,
     get_performance,
     load_context,
+    measure,
 )
 from marketingiq.analytics.periods import Period, PeriodSpec
 from marketingiq.core.build import build_core
@@ -116,7 +116,7 @@ def test_campaign_rows_add_up_to_the_totals(world):
     with engine.connect() as conn:
         ctx = load_context(conn, ORG)
         families = {"leads", "spend", "sessions"}
-        measured = _measure(
+        measured = measure(
             conn, ctx, query, Period(date(2026, 1, 1), date(2026, 3, 31)), "all", families
         )
 

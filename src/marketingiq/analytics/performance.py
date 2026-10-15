@@ -374,7 +374,7 @@ class Measured:
     unavailable: dict[Family, str]  # family -> why (a null_reason)
 
 
-def _measure(conn, ctx, query, period, population, families) -> Measured:
+def measure(conn, ctx, query, period, population, families) -> Measured:
     dimensions = list(query.group_by)
     lead_filtered = any(getattr(query.filters, name) for name in LEAD_FILTERS)
     unavailable: dict[Family, str] = {}
@@ -420,7 +420,7 @@ def _value(metric_name: str, values: dict[str, Decimal | None], measured: Measur
     return {"value": numerator / denominator}
 
 
-def _round(value: Decimal, unit: str) -> float | int:
+def round_value(value: Decimal, unit: str) -> float | int:
     places = {"currency": 2, "rate": 4, "ratio": 2, "count": 2}[unit]
     rounded = round(value, places)
     return (
@@ -430,7 +430,7 @@ def _round(value: Decimal, unit: str) -> float | int:
     )
 
 
-def _suppressed_bases(rows: list[dict[str, Decimal | None]]) -> list[set[str]]:
+def suppressed_bases(rows: list[dict[str, Decimal | None]]) -> list[set[str]]:
     """Per row, which lead-derived counts must be hidden (primary and secondary)."""
     hidden = []
     for values in rows:
@@ -462,18 +462,18 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         previous = comparison_period(period, query.compare_to, query.comparison, ctx.data_as_of)
         population = query.population or "acquisition"
         families = {family for name in query.metrics for family in METRICS[name].families}
-        current = _measure(conn, ctx, query, period, population, families)
-        prior = _measure(conn, ctx, query, previous, population, families) if previous else None
-        warnings = _warnings(conn, ctx, query, period, previous, population, families, current)
+        current = measure(conn, ctx, query, period, population, families)
+        prior = measure(conn, ctx, query, previous, population, families) if previous else None
+        warnings = query_warnings(conn, ctx, query, period, previous, population, families, current)
 
     keys = list(current.rows)
     if prior:
         keys += [key for key in prior.rows if key not in current.rows]
     base_rows = [current.rows.get(key, dict.fromkeys(current.totals, Decimal(0))) for key in keys]
-    hidden = _suppressed_bases(base_rows)
-    total_hidden = _suppressed_bases([current.totals])[0]
+    hidden = suppressed_bases(base_rows)
+    total_hidden = suppressed_bases([current.totals])[0]
     if any(hidden) or total_hidden:
-        warnings.append(_warning("small_cell_suppressed"))
+        warnings.append(warning("small_cell_suppressed"))
 
     def values_for(base_values, prior_values, hidden_bases) -> dict[str, dict]:
         result = {}
@@ -494,9 +494,9 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
                             cell["change_pct"] = cell["change"] / before["value"]
             for field in ("value", "previous", "change"):
                 if cell.get(field) is not None:
-                    cell[field] = _round(cell[field], metric.unit)
+                    cell[field] = round_value(cell[field], metric.unit)
             if cell.get("change_pct") is not None:
-                cell["change_pct"] = _round(cell["change_pct"], "rate")
+                cell["change_pct"] = round_value(cell["change_pct"], "rate")
             result[name] = cell
         return result
 
@@ -510,7 +510,7 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
             {
                 "key": "|".join(str(part) for part in key),
                 "dimensions": dimensions,
-                "labels": {d: _label(ctx, d, v) for d, v in dimensions.items()},
+                "labels": {d: label(ctx, d, v) for d, v in dimensions.items()},
                 "values": values_for(base_values, prior_values, hidden_bases),
             }
         )
@@ -548,17 +548,17 @@ def get_performance(engine: Engine, org_slug: str, query: PerformanceQuery) -> d
         "rows": rows[: query.limit],
         "row_count": len(rows),
         "totals": values_for(current.totals, prior.totals if prior else None, total_hidden),
-        "warnings": _unique(warnings),
+        "warnings": unique_warnings(warnings),
     }
 
 
-def _label(ctx: OrgContext, dimension: str, value: Any) -> str:
+def label(ctx: OrgContext, dimension: str, value: Any) -> str:
     if dimension == "campaign":
         return ctx.campaign_names.get(value, value)
     return str(value)
 
 
-_MESSAGES = {
+WARNING_MESSAGES = {
     "synthetic_data": "Synthetic data: these numbers describe a fictional business.",
     "population_default": "Population defaulted to new-customer acquisition leads.",
     "mapping_unverified": "Results use mapping rules that haven't been verified against the "
@@ -585,14 +585,16 @@ _MESSAGES = {
     "unequal_periods": "The two periods have different lengths.",
     "source_incomplete": "Part of the requested period is before the data starts.",
     "small_cell_suppressed": "Counts under 5 are hidden to protect privacy.",
+    "sources_not_additive": "Meta, GA4 and Salesforce each count leads their own way; compare "
+    "them side by side, never add them.",
 }
 
 
-def _warning(code: str) -> dict[str, str]:
-    return {"code": code, "message": _MESSAGES[code]}
+def warning(code: str) -> dict[str, str]:
+    return {"code": code, "message": WARNING_MESSAGES[code]}
 
 
-def _unique(warnings: list[dict[str, str]]) -> list[dict[str, str]]:
+def unique_warnings(warnings: list[dict[str, str]]) -> list[dict[str, str]]:
     seen, result = set(), []
     for warning in warnings:
         if warning["code"] not in seen:
@@ -601,7 +603,7 @@ def _unique(warnings: list[dict[str, str]]) -> list[dict[str, str]]:
     return result
 
 
-def _warnings(conn, ctx, query, period, previous, population, families, current) -> list[dict]:
+def query_warnings(conn, ctx, query, period, previous, population, families, current) -> list[dict]:
     codes = []
     if ctx.is_synthetic:
         codes.append("synthetic_data")
@@ -642,7 +644,7 @@ def _warnings(conn, ctx, query, period, previous, population, families, current)
             conn, ctx, period
         ):
             codes.append("classification_default_applied")
-    return [_warning(code) for code in codes]
+    return [warning(code) for code in codes]
 
 
 def _defaults_used(conn, ctx, period) -> bool:

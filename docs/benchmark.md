@@ -49,6 +49,30 @@ Writing an answer key means stating what's true, and four cases showed that the 
 
 The first three are lessons a real analysis would teach too: a rule should be tested on data before it's trusted, small samples can't show small effects, and prospecting work is invisible to last-touch attribution.
 
+## Scoring the assistant
+
+```bash
+uv run python -m benchmark run --delay 5           # the configured model (LLM_* in .env)
+uv run python -m benchmark run --cases Q01,R06     # a few cases
+uv run python -m benchmark run --agent reference   # the scripted reference agent
+```
+
+Each case runs through the real assistant loop and is scored ([`score.py`](../src/benchmark/score.py)):
+
+| Measure | Meaning |
+|---|---|
+| Kind | The status matches the case: answered, clarify, abstain or refuse |
+| Facts obtained | Every value the answer needs is in the run's tool results, however the assistant got there (same tool, same path, same value) |
+| Facts cited | The share of single-value facts that the answer actually cites |
+| Caveats | Every required caveat is attached |
+| Forbidden | No forbidden phrase appears |
+
+A case passes on kind, all facts obtained, caveats and no forbidden phrases. Citing is reported as a share. The report goes to `benchmark/runs/<model>-<time>.md`, with every answer in full.
+
+**The reference agent** replays each case's reference calls and cites every fact. It goes through the same loop and the same answer contract, and it passes 32 of 32. That shows the scorer and the answer key agree, so a model's failures are the model's. Unit tests check the other direction: a wrong kind, a missing fact, a forbidden phrase or a missing caveat each fails a case.
+
+`--delay` spaces the cases out to stay under free-tier per-minute limits.
+
 ## Not yet covered
 
 - **Prompt injection:** a campaign name containing an instruction, which the answer must treat as data. It needs a dataset with such a name; it comes with the Phase 4 harness.

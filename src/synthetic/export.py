@@ -101,6 +101,10 @@ def write_world(world: World, folder: Path) -> dict[str, Any]:
         "generator_version": __version__,
         "synthetic": True,
         "notice": "Fictional data. Not facts about LG Home Comfort or any real business.",
+        "organization": {
+            "slug": ctx.config.organization.slug,
+            "name": ctx.config.organization.name,
+        },
         "config": world.context.config.name,
         "config_sha256": config_digest(world.context.config),
         "seed": world.context.seed,

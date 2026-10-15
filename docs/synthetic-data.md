@@ -183,7 +183,7 @@ Emergency repairs: phone ~70%, callback form ~15%, chat ~10%, other ~5%.
 | Meta `utm_campaign` typed in a different letter case | 5% of ad clicks | Tests case-insensitive mapping |
 | Meta account time zone | America/Toronto | The tiny config uses America/Los_Angeles to test `timezone_mismatch` |
 
-**Invalid rows for loader tests** (negative spend, clicks above impressions, impossible dates, missing IDs, orphan references, each with its expected error code) come with the loader step, because the error codes are the loader's contract.
+**Invalid rows for loader tests** are not generated: they're hand-written fixtures in `tests/fixtures/dirty/`, one problem per row, with the expected error code for each in `expected_errors.csv` (see `docs/loading.md`). Links between files, such as an event pointing at a missing lead, are checked later, in the core step.
 
 ## 9. Planted scenarios
 

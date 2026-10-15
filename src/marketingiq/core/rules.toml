@@ -1,0 +1,204 @@
+# Rules that turn staging rows into the canonical core model.
+#
+# Every section has a version and a `verified` flag. None of it has been checked against
+# LG Home Comfort's real systems yet (docs/unverified-register.md), so every section is
+# verified = false, and results that depend on it carry the `mapping_unverified` caveat.
+# Values on the left are what a source sends; values on the right are canonical values
+# from src/marketingiq/core/vocabulary.py.
+
+[channels]
+version = "2026-10-15"
+verified = false
+search_engines = ["google", "bing", "yahoo", "duckduckgo"]
+social_sources = ["facebook", "instagram", "m.facebook.com", "l.facebook.com", "lm.facebook.com", "l.instagram.com"]
+paid_search_mediums = ["cpc", "ppc", "paidsearch"]
+paid_social_mediums = ["paid_social", "paidsocial", "cpm"]
+email_mediums = ["email"]
+# GA4 placeholder campaign values that mean "no campaign".
+untagged_campaigns = ["(organic)", "(direct)", "(referral)", "(not set)", "(none)"]
+
+[campaign_mapping]
+version = "2026-10-15"
+# U-17: the marketing team's naming sheet hasn't been reviewed against the ad accounts.
+verified = false
+
+[site]
+version = "2026-10-15"
+# U-16: page map of the synthetic site; the real site's paths are unverified.
+verified = false
+home = ["/"]
+quote = ["/get-a-quote/"]
+careers = ["/careers/"]
+blog_prefix = "/blog/"
+location_prefix = "/locations/"
+offer_prefix = "/offers/"
+
+[site.service_pages]
+"/heating/furnaces/" = "furnace"
+"/cooling/air-conditioners/" = "air_conditioner"
+"/heating-cooling/heat-pumps/" = "heat_pump"
+"/water/water-heaters/" = "water_heater"
+"/water/water-treatment/" = "water_treatment"
+"/air-quality/" = "air_quality"
+"/home-security/" = "security"
+"/generators/" = "generator"
+"/maintenance-plan/" = "maintenance_plan"
+
+[geography]
+version = "2026-10-15"
+# U-18: region grouping and aliases are this project's reporting choice, not yet reviewed.
+verified = false
+
+[[geography.regions]]
+key = "gta"
+cities = ["Toronto", "Mississauga", "Brampton", "Vaughan", "Markham", "Oakville", "Ajax", "Oshawa", "Milton"]
+
+[[geography.regions]]
+key = "hamilton_niagara"
+cities = ["Hamilton", "Burlington", "St. Catharines", "Niagara Falls"]
+
+[[geography.regions]]
+key = "ottawa"
+cities = ["Ottawa", "Kanata"]
+
+[[geography.regions]]
+key = "kw_guelph"
+cities = ["Kitchener", "Waterloo", "Guelph"]
+
+[[geography.regions]]
+key = "london_windsor"
+cities = ["London", "Windsor"]
+
+[[geography.regions]]
+key = "barrie_simcoe"
+cities = ["Barrie", "Bradford"]
+
+[[geography.regions]]
+key = "northern_other"
+cities = ["Sudbury", "North Bay", "Parry Sound", "Kenora", "Owen Sound"]
+
+[geography.city_aliases]
+"t.o." = "Toronto"
+"sauga" = "Mississauga"
+"woodbridge" = "Vaughan"
+"st catharines" = "St. Catharines"
+"saint catharines" = "St. Catharines"
+
+# Names that identify a region but not one city.
+[geography.region_aliases]
+"kw" = "kw_guelph"
+
+[geography.location_slugs]
+toronto = "Toronto"
+mississauga = "Mississauga"
+brampton = "Brampton"
+vaughan = "Vaughan"
+markham = "Markham"
+oakville = "Oakville"
+ajax = "Ajax"
+oshawa = "Oshawa"
+milton = "Milton"
+hamilton = "Hamilton"
+burlington = "Burlington"
+st-catharines = "St. Catharines"
+niagara = "Niagara Falls"
+ottawa = "Ottawa"
+kitchener = "Kitchener"
+waterloo = "Waterloo"
+london = "London"
+windsor = "Windsor"
+barrie = "Barrie"
+bradford = "Bradford"
+
+[salesforce]
+version = "2026-10-15"
+# U-02: picklist values and stage meanings are guesses until the real org's metadata is read.
+verified = false
+qualified_stages = ["qualified", "converted"]
+
+[salesforce.entry_points]
+"Quote Form" = "web_quote_form"
+"Callback Form" = "web_callback_form"
+"Booking" = "booking"
+"Phone" = "phone"
+"Web Chat" = "web_chat_agent"
+"Messenger" = "meta_messaging_agent"
+"Facebook Lead Ad" = "meta_lead_form"
+"Email/SMS" = "email_sms"
+"Other" = "other"
+
+[salesforce.request_types]
+"Installation" = "install_replace"
+"Sales" = "sales_general"
+"Service & Repair" = "repair_service"
+"Billing" = "billing"
+"Customer Service" = "customer_service"
+"Other" = "other"
+
+[salesforce.service_lines]
+"Furnace" = "furnace"
+"Air Conditioner" = "air_conditioner"
+"Heat Pump" = "heat_pump"
+"Water Heater" = "water_heater"
+"Water Treatment" = "water_treatment"
+"Air Quality" = "air_quality"
+"Home Security" = "security"
+"Generator" = "generator"
+"Maintenance Plan" = "maintenance_plan"
+
+[salesforce.lead_stages]
+"New" = "new"
+"Working" = "working"
+"Qualified" = "qualified"
+"Unqualified" = "disqualified"
+"Converted" = "converted"
+"Spam" = "invalid"
+"Service Scheduled" = "service_scheduled"
+"Closed - No Action" = "closed_no_action"
+
+[salesforce.appointment_kinds]
+"In-Home Consultation" = "in_home_consultation"
+"Service Visit" = "service_visit"
+
+[salesforce.appointment_statuses]
+"Scheduled" = "booked"
+"Completed" = "completed"
+"No Show" = "no_show"
+"Cancelled" = "cancelled"
+
+[salesforce.amount_bases]
+"Purchase" = "purchase_price"
+"Financed" = "financed_total"
+"Lease" = "lease_contract"
+"Monthly" = "monthly"
+
+# Lead sources that name a channel (evidence tier T4). "Web", "Phone" and "Other" don't.
+[salesforce.lead_source_channels]
+"Google" = "search_unspecified"
+"Facebook" = "social_unspecified"
+"Facebook Lead Ad" = "paid_social"
+"Referral" = "referral"
+"TV/Radio" = "offline_media"
+"Word of Mouth" = "word_of_mouth"
+"Email" = "email"
+
+[classification]
+version = "2026-10-15"
+verified = false
+# Submissions from the same person within this window are duplicates of the first.
+duplicate_window_hours = 72
+
+# U-20: request type when the lead has no structured field.
+[classification.entry_point_defaults]
+web_quote_form = "install_replace"
+booking = "install_replace"
+
+[classification.tactic_defaults]
+lead_form = "install_replace"
+promo = "install_replace"
+
+[attribution]
+version = "2026-10-15"
+verified = false
+# Sessions this many days before a lead (or less) count as its journey.
+lookback_days = 30

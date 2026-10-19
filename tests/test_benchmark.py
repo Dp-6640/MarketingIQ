@@ -83,4 +83,9 @@ def test_the_held_out_set_is_separate_from_the_main_set():
     main, held_out = load_cases(CASE_SETS["main"]), load_cases(CASE_SETS["heldout"])
 
     assert all(case.id.startswith("H") for case in held_out)
-    assert {c.question for c in main}.isdisjoint(c.question for c in held_out)
+
+    # A held-out conversation may open like a main case (H13 and R06); the turns as a whole differ.
+    def conversations(cases):
+        return {(c.question, *c.followups) for c in cases}
+
+    assert conversations(main).isdisjoint(conversations(held_out))

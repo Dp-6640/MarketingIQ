@@ -53,6 +53,11 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-10-19 | `dc872b0` | ADR-007: suppression alone can't stop differencing |
+| 2026-10-19 | `279c4f1` | Provider outages end with a clear message |
+| 2026-10-19 | `7046fd7` | Held-out check compares whole conversations |
+| 2026-10-19 | `9260d40` | Conversation cases in the benchmark |
+| 2026-10-19 | `4ba6edf` | Held-out result: 8 of 12 |
 | 2026-10-19 | `93147ff` | Conversations, and reopening past answers from the run log |
 | 2026-10-19 | `b8bf21d` | Held-out benchmark set, written before any model run |
 | 2026-10-19 | `80d991c` | Show where each answer's time goes |
@@ -465,6 +470,25 @@ After the fixes, the two implementations agree everywhere: 26 tests on the tiny 
 
 **Interview line:** "I wrote and committed a held-out set before running it, so the score couldn't be tuned. It came in at 67%, against 69% on the tuned set. And instrumenting latency showed that slow answers weren't the provider's rate limit: they were the model floundering, which also predicts a wrong answer."
 
+## Step 15: conversations in the benchmark, provider outages, and a privacy limit
+
+**What we did** (`9260d40`, `7046fd7` conversation cases, `279c4f1` provider outages, `dc872b0` ADR-007):
+
+- **Conversation cases.** A benchmark case can now include the user's replies. Two new held-out cases: H13 (asks which campaign, then gets the reply) passed. H14 (a follow-up that changes the period) gave exactly the right answer but scored as a failure: it typed the campaign's name instead of referencing it, and the scorer can't see that. By the held-out rules, the scorer isn't changed because of it; it's recorded instead.
+- **Provider outages end cleanly.** Trying the larger Gemini 3.8 Flash, the free tier answered "high demand" and then stopped responding. Instead of a traceback, the assistant now says the model is overloaded or unreachable, and the API answers 503.
+- **A privacy limit, demonstrated.** One total (9) and one query per campaign recovered a hidden count of 1 exactly. Small-cell suppression decides per query, so no per-query rule can stop subtraction across queries. ADR-007 proposes consistent noise (the cell key method) before any real data.
+
+**Why:**
+
+- **Test what users actually do.** The demo session showed people reply to clarifying questions, so the benchmark now has replies too.
+- **Don't change the measuring stick after seeing the result.** H14's false negative is a real scorer weakness. Fixing it because of a held-out result would make held-out scores meaningless, so the fix waits for evidence from the main set or a new held-out batch.
+- **Verify a privacy claim by attacking it.** The docs said suppression hides small counts. Trying to recover one showed that's true for one result and false across several. The docs now say so, and the decision moves to the privacy review with options and a recommendation.
+- **I also made a process mistake:** one commit went in with a failing test, because `pytest ... | tail` hid pytest's exit code. Commits are now made only when the test command itself succeeds.
+
+**Concepts:** multi-turn evaluation, false negatives in automated scoring, differencing attacks, statistical disclosure control, the cell key method, differential privacy, exit codes in shell pipelines.
+
+**Interview line:** "I tried to break my own privacy control and succeeded: a total plus one query per campaign recovered a suppressed count of 1. Per-query suppression can't fix that, so I wrote an ADR recommending consistent noise, the method national statistics offices use for self-service table builders, as a gate before any real data."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -534,6 +558,9 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | Backoff | Waiting before retrying a rate-limited request, ideally as long as the server asks | The model adapter |
 | Pre-registration | Writing down (here, committing) the test before seeing results, so it can't be bent to fit them | The held-out set's first commit |
 | Observability | Recording what a system did and how long each part took, so problems can be measured instead of guessed | The run timing breakdown |
+| Statistical disclosure control | Methods that let statistics be published without revealing individuals: suppression, rounding, noise | ADR-007 |
+| Cell key method | Adding the same small, fixed noise to a table cell whichever query it appears in, so subtraction can't recover it | ADR-007 (proposed) |
+| False negative | A check that fails something that was actually right | Held-out case H14 |
 
 ## Interview talking points
 
@@ -560,6 +587,7 @@ These questions involve no company data, only how the systems are set up. Each a
 - [ ] What are the real Lead Status values, and is field history tracked? (U-02, U-03)
 - [ ] Can the project use the company's name, or be shown publicly? Check your employment agreement and ask your manager. (U-23)
 - [ ] Is there a separate form for nominations, or do they come through the quote form? (U-20; they currently count as acquisition leads)
+- [ ] Ask who would run the privacy review (R0), and show them ADR-007: hidden counts can be recovered by subtraction, so real data needs consistent noise
 - [ ] How many leads a month does each campaign really get? That decides whether hiding counts under 5 leaves useful campaign-level answers (U-15)
 - [x] Create a free Gemini API key and run the benchmark (done 2026-10-15: 22 of 32)
 - [ ] Does the performance marketing manager agree with the rule for "cheap leads that rarely qualify": cost per lead and qualification rate both below the median, among campaigns with at least 10 leads? (question 6)

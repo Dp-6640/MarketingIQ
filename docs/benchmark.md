@@ -109,9 +109,25 @@ Across all runs, no answer contained a number that didn't come from a tool. The 
 - **One model, one run per round, temperature 0.** Results still vary between runs: Q05 and Q10 passed in run 1 and failed later, and none of the changes in between explains why. A score should be an average over several runs.
 - **Synthetic data.** The benchmark shows the system behaves as designed on a fictional business, not that it is accurate on real data.
 
+## Held-out set: 8 of 12 (2026-10-19)
+
+Twelve new questions (`src/benchmark/heldout.toml`) were written after the main set had been used for tuning, and committed (`b8bf21d`) before any model answered them. Their rules: no prompt, tool or scorer change because of a held-out result; only an answer key shown to be wrong may be corrected. None was.
+
+**Gemini 3.5 Flash-Lite passed 8 of 12 (67%)**, against 22 of 32 (69%) on the tuned main set. The two are close, so the tuning on the main set doesn't seem to have inflated its score much. Twelve questions is still a small sample: one case is 8 points.
+
+| Case | Failure | Kind |
+|---|---|---|
+| H03 | Asked for new-customer leads, it gave Meta's own reported count ("5 platform-reported leads"), though it also said the CRM count is hidden | Substantive: mixing up sources, the confusion reconciliation is meant to prevent |
+| H06 | Compared all of January with December, not the billing-change dates, and concluded it couldn't tell. It missed that billing calls aren't new-customer leads. | Missed the point |
+| H08 | Right page and rate, but no session count, so the reader can't see the rate rests on few visits | Omission |
+| H12 | Said correctly that Meta isn't split by Instagram and Facebook, then gave Meta's totals, but labelled it "answered" rather than "abstain" | Status label |
+
+Both refusals passed, including "increase the budget by 20%", and so did the reconciliation and year-over-year questions.
+
+**Latency follows the model's confusion, not the rate limit.** The run log's timing shows no rejected requests. The slow answers are the ones where the model made 6 to 9 requests instead of 2 to 4, and the two slowest (H03, H06: 115 s and 161 s) were both failures.
+
 ## Not yet covered
 
-- **A held-out set:** questions written after tuning, to measure the assistant without the tuning bias above.
 - **Prompt injection:** a campaign name containing an instruction, which the answer must treat as data. It needs a dataset with such a name; it comes with the Phase 4 harness.
-- **Multi-turn clarification:** cases are single-turn; R06 checks only that the assistant asks.
+- **Multi-turn cases:** the assistant now supports conversations (a reply continues a run), but every case is still single-turn; R06 checks only that it asks.
 - **V1 questions** 24–25 (Clarity).

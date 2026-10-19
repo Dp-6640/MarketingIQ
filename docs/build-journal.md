@@ -53,6 +53,11 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-10-19 | `93147ff` | Conversations, and reopening past answers from the run log |
+| 2026-10-19 | `b8bf21d` | Held-out benchmark set, written before any model run |
+| 2026-10-19 | `80d991c` | Show where each answer's time goes |
+| 2026-10-19 | `a4f1d89` | Demo page: readable Ask button in dark mode |
+| 2026-10-15 | `5cf4600` | Evaluation results: three Gemini runs |
 | 2026-10-15 | `ee8cdf9` | Privacy fix from run 3: hide small previous-period counts |
 | 2026-10-15 | `346c6c0` | Fixes from run 2, including no-spend-feed shown as $0 |
 | 2026-10-15 | `903facf` | Fixes from run 1: pacing, periods, formatting, statuses |
@@ -441,6 +446,25 @@ After the fixes, the two implementations agree everywhere: 26 tests on the tiny 
 
 **Interview line:** "The first real run scored 11 of 32. I sorted every failure by cause, not just by score. Half were infrastructure or my own bugs, including a privacy leak in comparison periods and a 'no spend feed' shown as zero spend, which the model surfaced and 300 unit tests hadn't. After three rounds it scores 22 of 32. I stopped there, because more tuning on the same questions would only make the number less honest; a held-out set is next."
 
+## Step 14: a held-out score, and what a real user found
+
+**What we built** (`80d991c` timing, `b8bf21d` held-out set, `93147ff` conversations and run log):
+
+- **A held-out set:** 12 new questions, committed before any model saw them. **8 of 12 (67%)**, against 69% on the tuned main set.
+- **A timing breakdown** for every answer: model, tools, waiting on the provider.
+- **Conversations:** a reply can continue an earlier answer.
+- **A recent-questions list** on the demo page, so earlier answers open instantly from the run log.
+
+**Why:**
+
+- **A score you tuned on isn't a score you can quote.** The held-out set was written and committed first, with rules against changing anything because of it. The close result (67% vs 69%) is the evidence that the earlier tuning was general rules, not overfitting.
+- **Real use finds what the benchmark doesn't.** Trying the demo page, the user asked "How is the furnace campaign doing?", got a clarifying question, and replied by adding "Furnace Promo" to the question. That run failed. The benchmark never had a second turn. So: conversations, and tool results sent without a wrapper key the model kept copying into its references.
+- **Measure before guessing.** One answer took 100 seconds. Instead of assuming the rate limit, every run now records where its time goes. The data showed no rate limiting at all: slow answers are the ones where the model takes many steps, and those are often the wrong ones.
+
+**Concepts:** held-out evaluation, pre-registration (committing the test before the result), latency breakdown, observability, multi-turn conversation state.
+
+**Interview line:** "I wrote and committed a held-out set before running it, so the score couldn't be tuned. It came in at 67%, against 69% on the tuned set. And instrumenting latency showed that slow answers weren't the provider's rate limit: they were the model floundering, which also predicts a wrong answer."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -508,6 +532,8 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | Held-out set | Questions kept aside and never used for tuning, so they measure honestly | Next step |
 | Differencing attack | Recovering a hidden number by comparing results that hide different cells | Cross-tool suppression gap |
 | Backoff | Waiting before retrying a rate-limited request, ideally as long as the server asks | The model adapter |
+| Pre-registration | Writing down (here, committing) the test before seeing results, so it can't be bent to fit them | The held-out set's first commit |
+| Observability | Recording what a system did and how long each part took, so problems can be measured instead of guessed | The run timing breakdown |
 
 ## Interview talking points
 

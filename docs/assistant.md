@@ -31,6 +31,16 @@ Other providers are a configuration change (`LLM_BASE_URL`, `LLM_MODEL`; see `.e
 
 **Free tiers may use prompts to improve the provider's products.** That is acceptable here only because every number describes a fictional business. No company data may ever go to a free tier (U-14).
 
+## Conversations
+
+A question can continue an earlier run: send `{"question": "...", "follows": "<run id>"}`. The model then sees up to four earlier question-and-answer turns, so a short reply ("the promo one") answers its clarifying question. Earlier answers are context only: a number in the new answer still has to come from this run's own tool calls. The demo page continues the conversation automatically after a clarifying question, and offers a checkbox otherwise.
+
+## The run log, and where the time goes
+
+`GET /api/v1/assistant/runs` lists recent questions and `GET /api/v1/assistant/runs/{id}` reopens one in the same shape as a fresh answer. The demo page lists them, so earlier answers open instantly.
+
+Every run records model time, tool time and time spent waiting on the provider (pacing to 14 requests a minute, rate-limit sleeps). The page, the terminal command and the log show it. On Gemini's free tier, tools take well under a second. A simple answer takes 10 to 30 seconds, mostly the model. A long one usually means the model took many steps, and that is often a sign of a weak answer.
+
 ## How a run works
 
 1. The model gets a system prompt ([`prompt.py`](../src/marketingiq/assistant/prompt.py)), the question, and nine tools: the eight read-only analytics tools plus `submit_answer`. The prompt sets the rules: resolve names first, never type numbers, the four statuses, no causal language, never add sources together.

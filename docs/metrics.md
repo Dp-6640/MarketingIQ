@@ -76,6 +76,7 @@ Applies to every REST and assistant output built from lead-level data (spend-onl
 - **Secondary suppression:** if exactly one cell in a group is suppressed and the group total is shown, the next-smallest cell is suppressed too, so the hidden value can't be recovered by subtracting from the total.
 - Any suppression adds `small_cell_suppressed`.
 - k = 5 is a starting value, not a privacy-reviewed threshold; it is part of the R0 review.
+- **Suppression protects one result, not a series of them.** Each query decides what to hide on its own, so a hidden count can be recovered by subtraction across queries (for example one total, then one query per campaign). The demonstration and the proposed fix, consistent noise by the cell key method, are in ADR-007; that is required before real data.
 
 ## Required metadata in every result
 

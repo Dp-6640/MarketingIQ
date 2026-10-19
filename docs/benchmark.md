@@ -90,7 +90,7 @@ Running a real model found three bugs that 300 deterministic tests had missed. E
 
 1. **No spend feed shown as $0.** Google Ads, email and the no-campaign group got spend 0, and were ranked on it. The model reported "Google Ads recorded $0.00 in spend". Spend is now unavailable (`no_spend_source`) for groups without a feed.
 2. **A comparison period's small counts weren't hidden.** "Qualified leads fell from 1 to 0" revealed a count of 1. Previous-period values built from counts under 5 are now hidden too.
-3. **An answer key was wrong.** For Q18, explain_metric_change hides the retargeting row through secondary suppression, so the key said no campaign matched. The model found the match (spend up, qualified leads 14 to 8) through get_performance. That also shows a privacy gap that remains open: **suppression is decided per query**, so a cell one tool hides can be visible in another (a differencing risk). Consistent suppression across tools is part of the R0 privacy review.
+3. **An answer key was wrong.** For Q18, explain_metric_change hides the retargeting row through secondary suppression, so the key said no campaign matched. The model found the match (spend up, qualified leads 14 to 8) through get_performance. That also shows a privacy gap that remains open: **suppression is decided per query**, so a cell one tool hides can be visible in another (a differencing risk). It goes further than two tools disagreeing: a total and one query per campaign recover a hidden count exactly (ADR-007), so per-query suppression can't close it; consistent noise can, and is proposed for the R0 privacy review.
 
 ### What numbers by reference does and doesn't guarantee
 

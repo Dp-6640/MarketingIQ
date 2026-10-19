@@ -18,7 +18,7 @@ This register is a safeguard against turning plausible assumptions into company 
 | U-12 | Sales cycle and deal-value distributions by service line | Cohort maturity and revenue modelling | Analyse approved de-identified exports after approval | Clearly labelled synthetic distributions only |
 | U-13 | Clarity masking and export settings | Privacy and page-level diagnostics | Review project settings and current official docs | V1 only; aggregate page-level synthetic data, no recordings |
 | U-14 | LLM provider approval, retention and data region | Determines whether any company-derived data can be sent to a model | Privacy/security review of provider terms and approved deployment | Synthetic aggregate data only; one provider behind an interface. Development uses Google Gemini's free tier (2026-10-15), whose terms may allow prompts to be used to improve Google's products: acceptable for synthetic data only. Any real-data use needs an approved, paid provider with no training on inputs. |
-| U-15 | Privacy Officer approval/legal basis for CRM analytics and LLM processing | Required before real-data use | Formal review and written authorization | No genuine company data in development |
+| U-15 | Privacy Officer approval/legal basis for CRM analytics and LLM processing | Required before real-data use | Formal review and written authorization. The review must also decide disclosure control: small-cell suppression alone can be defeated by subtraction across queries (shown in ADR-007), so choose the noise method, k, and exempt measures. | No genuine company data in development |
 | U-16 | Source completeness and event naming in GA4 | Reconciliation interpretation | Review event definitions, tag setup and export coverage | Synthetic event names, marked as examples |
 | U-17 | Campaign mapping between platform IDs and UTMs | Campaign-level cost and credit | Compare approved export schemas and campaign naming rules | Versioned synthetic mappings, with unmapped cases and `verified=false` flag |
 | U-18 | City aliases and region mapping | Geographic reporting and small-cell risks | Validate an approved normalization list | Synthetic alias file, versioned; unknown city retained as unknown |
@@ -30,7 +30,7 @@ This register is a safeguard against turning plausible assumptions into company 
 
 ## Real-data gates
 
-- **R0 — Governance:** written approval of purpose, field allowlist, de-identification, storage, LLM boundary and retention. Do not load company data before this gate.
+- **R0 — Governance:** written approval of purpose, field allowlist, de-identification, storage, LLM boundary, retention and disclosure control (ADR-007: consistent noise on lead counts, since suppression alone can be defeated). Do not load company data before this gate.
 - **R1 — Readiness:** run a local-only audit of approved de-identified exports; no LLM. Measure identifier capture, mapping coverage, stage timestamp availability, duplicates, timezone consistency and reconciliation gaps.
 - **R2 — Controlled integration:** read-only credentials with least privilege; compare imported totals with source system reports.
 - **R3 — Operational approval:** approved provider/hosting, authentication/roles, logging, retention and security review.

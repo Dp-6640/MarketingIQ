@@ -60,6 +60,13 @@
   .error { color: var(--bad); }
   .hidden { display: none; }
   .table-wrap { overflow-x: auto; }
+  ul.recent { list-style: none; margin: 0; padding: 0; }
+  ul.recent li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0;
+                 border-bottom: 1px solid var(--line); }
+  ul.recent li:last-child { border-bottom: 0; }
+  ul.recent button { background: none; border: 0; padding: 0; color: var(--accent);
+                     text-align: left; flex: 1; }
+  ul.recent .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -75,9 +82,17 @@
     <textarea id="question" placeholder="Which campaigns brought in the most qualified new-customer leads last month?"></textarea>
     <div class="row">
       <button class="ask" id="ask">Ask</button>
+      <label class="tagline hidden" id="follow-label">
+        <input type="checkbox" id="follow"> Reply to the answer below (continue the conversation)
+      </label>
       <span class="tagline" id="working"></span>
     </div>
     <div class="row" id="examples"></div>
+  </section>
+
+  <section class="panel" id="recent-panel">
+    <h2 style="margin-top:0">Recent questions <span class="tagline">(open instantly from the run log)</span></h2>
+    <ul class="recent" id="recent"></ul>
   </section>
 
   <section class="panel hidden" id="result">
@@ -130,18 +145,20 @@ $("question").addEventListener("keydown", (e) => {
 
 async function ask() {
   const question = $("question").value.trim();
-  if (question.length < 3) return;
+  if (!question) return;
+  const follows = $("follow").checked && lastRunId ? lastRunId : null;
   $("ask").disabled = true;
   $("working").textContent = "Working: choosing tools, reading results...";
   try {
     const response = await fetch("/api/v1/assistant/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, follows }),
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.detail ? JSON.stringify(body.detail) : response.statusText);
     show(body);
+    loadRecent();
   } catch (error) {
     show({ status: "failed", segments: [], citations: [], caveats: [], calls: [],
            errors: [String(error.message || error)] });
@@ -151,8 +168,50 @@ async function ask() {
   }
 }
 
+async function loadRecent() {
+  const list = $("recent");
+  try {
+    const response = await fetch("/api/v1/assistant/runs?limit=12");
+    const { runs } = await response.json();
+    list.replaceChildren();
+    for (const r of runs) {
+      const li = el("li");
+      li.append(el("span", r.status, { class: "status " + r.status }));
+      const open = el("button", r.question, { type: "button" });
+      open.addEventListener("click", () => openRun(r.id));
+      li.append(open);
+      li.append(el("span", new Date(r.created_at).toLocaleString(), { class: "when" }));
+      list.append(li);
+    }
+    if (!runs.length) list.append(el("li", "No questions asked yet."));
+  } catch (error) {
+    list.replaceChildren(el("li", "Couldn't load the run log."));
+  }
+}
+
+async function openRun(id) {
+  const response = await fetch(`/api/v1/assistant/runs/${encodeURIComponent(id)}`);
+  const run = await response.json();
+  if (!response.ok) return;
+  $("question").value = run.question;
+  show(run);
+  $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+loadRecent();
+let lastRunId = null;
+
 function show(run) {
   $("result").classList.remove("hidden");
+  // A reply continues this run's conversation; after a clarifying question it's the default.
+  lastRunId = run.run_id || null;
+  $("follow-label").classList.toggle("hidden", !lastRunId);
+  $("follow").checked = run.status === "clarify";
+  if (run.status === "clarify") {
+    $("question").value = "";
+    $("question").placeholder = "Your reply, e.g. the lead form promo";
+    $("question").focus();
+  }
   const status = $("status");
   status.className = "status " + run.status;
   status.textContent = run.status;

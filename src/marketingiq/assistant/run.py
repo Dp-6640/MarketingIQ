@@ -9,6 +9,7 @@ unknown reference) the model gets the errors and one more try, then the run fail
 import json
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -56,6 +57,7 @@ class Run:
     model_ms: int = 0
     wait_ms: int = 0
     rate_limited: int = 0
+    follows: uuid.UUID | None = None  # the run this one continues, in a conversation
 
     def timing(self) -> dict[str, int]:
         """Where the time went: the model, the tools, and waiting on the provider's limits."""
@@ -119,7 +121,9 @@ def _execute(run: Run, call: ToolCall, engine: Engine, org: str) -> str:
     record.ms = int((time.perf_counter() - started) * 1000)
     if not record.ok:
         return _dumps({"error": record.error})
-    return _dumps({"call": record.id, "result": run.results[record.id]})
+    # The result's own fields, with its call number beside them: paths start at the top
+    # level, so there is no wrapper key to copy into a reference by mistake.
+    return _dumps({"_call": record.id, **run.results[record.id]})
 
 
 def ask(
@@ -129,8 +133,12 @@ def ask(
     org: str,
     model: ChatModel,
     store: bool = True,
+    history: Sequence[tuple[str, str]] = (),
+    follows: uuid.UUID | None = None,
 ) -> Run:
-    run = Run(id=uuid.uuid4(), question=question, model=model.name)
+    """Answer one question. `history` holds earlier (question, answer) turns of the same
+    conversation, oldest first; `follows` is the run this one continues."""
+    run = Run(id=uuid.uuid4(), question=question, model=model.name, follows=follows)
     started = time.perf_counter()
     with engine.connect() as conn:
         org_row = conn.execute(
@@ -142,8 +150,13 @@ def ask(
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt(org_row.data_as_of, org_row.currency)},
-        {"role": "user", "content": question},
     ]
+    for earlier_question, earlier_answer in history:
+        messages += [
+            {"role": "user", "content": earlier_question},
+            {"role": "assistant", "content": earlier_answer},
+        ]
+    messages.append({"role": "user", "content": question})
     tools = tool_definitions([("submit_answer", SUBMIT_DESCRIPTION, SubmitAnswer)])
     answer_tries = 0
     while run.steps < MAX_STEPS and run.status == "failed" and answer_tries < MAX_ANSWER_TRIES:
@@ -210,6 +223,7 @@ def _row(run: Run, org_id: int) -> dict:
         "citations": [asdict(c) for c in rendered.citations] if rendered else [],
         "caveats": rendered.caveats if rendered else [],
         "errors": run.errors,
+        "follows": str(run.follows) if run.follows else None,
         "timing": run.timing(),
     }
     return {

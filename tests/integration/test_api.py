@@ -146,3 +146,80 @@ def test_the_demo_page_is_served(client):
     response = client.get("/")
 
     assert response.status_code == 200 and "Synthetic data" in response.text
+
+
+def test_a_logged_run_can_be_listed_and_reopened(client):
+    script = ScriptedModel(
+        [
+            Reply(None, [call("get_performance", {"period": QUARTER, "metrics": ["leads"]})]),
+            Reply(
+                None,
+                [
+                    call(
+                        "submit_answer",
+                        {"status": "answered", "answer": "{{c1:totals.leads}} leads."},
+                    )
+                ],
+            ),
+        ]
+    )
+    app.dependency_overrides[chat_model] = lambda: script
+    try:
+        fresh = client.post("/api/v1/assistant/ask", json={"question": "Leads, logged?"}).json()
+    finally:
+        del app.dependency_overrides[chat_model]
+
+    listed = client.get("/api/v1/assistant/runs", params={"limit": 5}).json()["runs"]
+    reopened = client.get(f"/api/v1/assistant/runs/{fresh['run_id']}").json()
+
+    assert listed[0]["id"] == fresh["run_id"] and listed[0]["question"] == "Leads, logged?"
+    assert reopened["answer"] == fresh["answer"] and reopened["segments"] == fresh["segments"]
+    assert reopened["citations"] == fresh["citations"] and reopened["timing"] == fresh["timing"]
+
+
+def test_reopening_an_unknown_run_is_404(client):
+    missing = client.get("/api/v1/assistant/runs/00000000-0000-0000-0000-000000000000")
+
+    assert missing.status_code == 404
+    assert client.get("/api/v1/assistant/runs/not-a-uuid").status_code == 422
+
+
+def test_a_reply_continues_the_conversation(client):
+    def asked(question, steps, follows=None):
+        app.dependency_overrides[chat_model] = lambda: ScriptedModel(steps)
+        try:
+            body = {"question": question, "follows": follows}
+            return client.post("/api/v1/assistant/ask", json=body).json()
+        finally:
+            del app.dependency_overrides[chat_model]
+
+    first = asked(
+        "How is the furnace campaign doing?",
+        [Reply(None, [call("submit_answer", {"status": "clarify", "answer": "Which one?"})])],
+    )
+    seen = []
+
+    def reply_step(messages):
+        seen.extend(messages)
+        return Reply(None, [call("submit_answer", {"status": "refuse", "answer": "Noted."})])
+
+    second = asked("The promo one", [reply_step], follows=first["run_id"])
+
+    roles = [(m["role"], m["content"]) for m in seen[1:]]
+    assert roles == [
+        ("user", "How is the furnace campaign doing?"),
+        ("assistant", "Which one?"),
+        ("user", "The promo one"),
+    ]
+    assert second["follows"] == first["run_id"]
+    reopened = client.get(f"/api/v1/assistant/runs/{second['run_id']}").json()
+    assert reopened["follows"] == first["run_id"]
+
+
+def test_following_an_unknown_run_is_404(client):
+    body = {"question": "and?", "follows": "00000000-0000-0000-0000-000000000000"}
+    app.dependency_overrides[chat_model] = lambda: ScriptedModel([])
+    try:
+        assert client.post("/api/v1/assistant/ask", json=body).status_code == 404
+    finally:
+        del app.dependency_overrides[chat_model]

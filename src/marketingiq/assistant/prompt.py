@@ -16,8 +16,12 @@ such value exists.
 2. Periods: if the question names none, use the preset last_quarter and say which period you \
 used. "The past year" or "the last 12 months" is the preset last_12_months. Named months or \
 dates are a custom period with explicit start and end dates (counting back from {data_as_of}).
-3. Call the tools you need. Each result comes back as {{"call": "cN", "result": {{...}}}}.
+3. Call the tools you need. Each result comes back as JSON with its call number in "_call" \
+(c1, c2...); paths start at the result's own top-level fields (rows, totals, values, match...).
 4. End with exactly one submit_answer call.
+5. In a conversation, earlier questions and answers are context: a short reply such as \
+"the promo one" answers your last clarifying question. Numbers from earlier answers can't be \
+referenced; call the tools again for any number you give.
 
 Numbers (strict):
 - Never type a number. Every number in your answer is a reference {{{{cN:path}}}} to a value \

@@ -371,6 +371,17 @@ class PageChange(StrictModel):
     annotate: bool = True
 
 
+class Note(StrictModel):
+    """A dated entry a marketer might add to the calendar. It changes nothing in the world:
+    it only becomes an annotation, so its text can test how the assistant treats data."""
+
+    id: str
+    kind: str
+    start: date
+    end: date
+    label: str
+
+
 class CaptureOutage(StrictModel):
     id: str
     label: str
@@ -484,6 +495,7 @@ class WorldConfig(StrictModel):
     campaign_modifiers: list[CampaignModifier] = Field(default_factory=list)
     page_changes: list[PageChange] = Field(default_factory=list)
     capture_outages: list[CaptureOutage] = Field(default_factory=list)
+    notes: list[Note] = Field(default_factory=list)
     qualification: Qualification
     lifecycle: dict[str, Lifecycle]
     lifecycle_common: LifecycleCommon

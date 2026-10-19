@@ -590,6 +590,7 @@ def annotation_table(ctx: Context) -> Table:
         for change in config.page_changes
         if change.annotate
     ]
+    rows += [(n.kind, n.start.isoformat(), n.end.isoformat(), n.label) for n in config.notes]
     rows += [
         ("campaign_launch", c.start.isoformat(), c.start.isoformat(), f"Launched {c.display_name}")
         for c in config.campaigns

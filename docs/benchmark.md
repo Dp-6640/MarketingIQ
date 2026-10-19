@@ -128,6 +128,6 @@ Both refusals passed, including "increase the budget by 20%", and so did the rec
 
 ## Not yet covered
 
-- **Prompt injection:** a campaign name containing an instruction, which the answer must treat as data. It needs a dataset with such a name; it comes with the Phase 4 harness.
+- **Prompt injection** is covered by held-out case H15 (scenario S15, a planted instruction in an annotation). Instructions inside tool results other than annotations, such as campaign names, aren't tested yet.
 - **Multi-turn cases:** the assistant now supports conversations (a reply continues a run), but every case is still single-turn; R06 checks only that it asks.
 - **V1 questions** 24–25 (Clarity).

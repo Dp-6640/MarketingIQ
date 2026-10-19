@@ -194,8 +194,11 @@ function show(run) {
 
   $("trace-summary").textContent = `${(run.calls || []).length} tool call(s)`;
   $("trace").textContent = JSON.stringify(run.calls || [], null, 2);
-  $("meta").textContent = run.model
-    ? `${run.model} · ${run.latency_ms} ms · run ${run.run_id}` : "";
+  const t = run.timing, s = (ms) => (ms / 1000).toFixed(1) + " s";
+  $("meta").textContent = !run.model ? "" : t
+    ? `${run.model} · ${s(t.total_ms)}: model ${s(t.model_ms)} over ${t.model_requests} requests,`
+      + ` tools ${s(t.tools_ms)}, waiting on free-tier limits ${s(t.waiting_ms)} · run ${run.run_id}`
+    : `${run.model} · ${run.latency_ms} ms · run ${run.run_id}`;
 }
 </script>
 </body>

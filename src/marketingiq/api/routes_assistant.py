@@ -65,6 +65,7 @@ def present(run: Run) -> dict[str, Any]:
         "errors": run.errors if run.status == "failed" else [],
         "model": run.model,
         "latency_ms": run.latency_ms,
+        "timing": run.timing(),
     }
 
 

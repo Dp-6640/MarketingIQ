@@ -34,7 +34,13 @@ def main() -> None:
             print(f"  - {caveat['message']}")
     for error in run.errors if run.status == "failed" else []:
         print(f"  ! {error}")
-    print(f"\n{run.model}, {run.steps} steps, {run.latency_ms} ms, run {run.id}")
+    t = run.timing()
+    print(
+        f"\n{run.model}, run {run.id}: {t['total_ms'] / 1000:.1f} s in all; model"
+        f" {t['model_ms'] / 1000:.1f} s over {t['model_requests']} requests, tools"
+        f" {t['tools_ms'] / 1000:.1f} s, waiting on rate limits {t['waiting_ms'] / 1000:.1f} s"
+        f" ({t['rate_limited']} rejected)"
+    )
 
 
 if __name__ == "__main__":

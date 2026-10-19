@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from openai import OpenAI, RateLimitError
+from openai import APIConnectionError, InternalServerError, OpenAI, RateLimitError
 
 from marketingiq.config import get_settings
 
@@ -33,6 +33,9 @@ class Reply:
     tool_calls: list[ToolCall] = field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    model_ms: int = 0  # the model's own time for the request that succeeded
+    wait_ms: int = 0  # pacing, rate-limit sleeps and rejected requests
+    rate_limited: int = 0  # requests the provider rejected with 429
 
     def as_message(self) -> dict[str, Any]:
         """The reply as an assistant message to append to the conversation."""
@@ -70,21 +73,26 @@ class OpenAICompatible:
     ):
         self.name = model
         self._model = model
-        # Retries for rate limits are ours (they honour the provider's retry delay).
-        self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=2)
+        # Every retry is ours, so waiting is counted and rate limits honour the provider's
+        # retry delay (the client library would otherwise retry 429s silently).
+        self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
         self._interval = 60.0 / requests_per_minute if requests_per_minute else 0.0
         self._max_waits = max_waits
 
-    def _pace(self) -> None:
+    def _pace(self) -> float:
+        """Sleep until the next request is allowed; returns the seconds slept."""
         global _last_request
-        wait = _last_request + self._interval - time.monotonic()
-        if wait > 0:
+        wait = max(0.0, _last_request + self._interval - time.monotonic())
+        if wait:
             time.sleep(wait)
         _last_request = time.monotonic()
+        return wait
 
     def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Reply:
+        waited, rejected = 0.0, 0
         for attempt in range(self._max_waits + 1):
-            self._pace()
+            waited += self._pace()
+            started = time.monotonic()
             try:
                 response = self._client.chat.completions.create(
                     model=self._model,
@@ -93,12 +101,21 @@ class OpenAICompatible:
                     tool_choice="auto",
                     temperature=0,
                 )
+                model_seconds = time.monotonic() - started
                 break
             except RateLimitError as exc:
+                rejected += 1
                 detail = str(exc)
                 if "PerDay" in detail or attempt == self._max_waits:
                     raise ProviderQuotaExhausted(_quota_message(detail)) from None
                 time.sleep(_retry_delay(detail))
+                waited += time.monotonic() - started
+            except (APIConnectionError, InternalServerError):
+                # A dropped connection or a 5xx: brief backoff, then the same limit of tries.
+                if attempt == self._max_waits:
+                    raise
+                time.sleep(2 ** min(attempt, 4))
+                waited += time.monotonic() - started
         message = response.choices[0].message
         calls = [
             ToolCall(
@@ -116,6 +133,9 @@ class OpenAICompatible:
             tool_calls=calls,
             prompt_tokens=usage.prompt_tokens if usage else 0,
             completion_tokens=usage.completion_tokens if usage else 0,
+            model_ms=int(model_seconds * 1000),
+            wait_ms=int(waited * 1000),
+            rate_limited=rejected,
         )
 
 

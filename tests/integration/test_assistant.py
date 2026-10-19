@@ -135,3 +135,24 @@ def test_the_app_role_cannot_change_anything_but_its_log(engines):
     _, app = engines
     with app.connect() as conn, pytest.raises(Exception, match="permission denied"):
         conn.execute(text("DELETE FROM app.assistant_runs"))
+
+
+def test_a_run_says_where_its_time_went(engines):
+    _, app = engines
+    model = ScriptedModel(
+        [
+            Reply(None, [call("get_performance", SPEND)], model_ms=1200, wait_ms=4000),
+            Reply(
+                None,
+                [call("submit_answer", {"status": "answered", "answer": "{{c1:totals.spend}}"})],
+                model_ms=800,
+                rate_limited=1,
+            ),
+        ]
+    )
+
+    timing = ask("Spend?", engine=app, org=ORG, model=model, store=False).timing()
+
+    assert timing["model_ms"] == 2000 and timing["waiting_ms"] == 4000
+    assert timing["model_requests"] == 2 and timing["rate_limited"] == 1
+    assert timing["tools_ms"] >= 0 and timing["total_ms"] >= 0

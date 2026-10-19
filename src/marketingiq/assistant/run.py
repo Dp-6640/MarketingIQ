@@ -53,6 +53,22 @@ class Run:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     latency_ms: int = 0
+    model_ms: int = 0
+    wait_ms: int = 0
+    rate_limited: int = 0
+
+    def timing(self) -> dict[str, int]:
+        """Where the time went: the model, the tools, and waiting on the provider's limits."""
+        tools = sum(c.ms for c in self.calls)
+        return {
+            "total_ms": self.latency_ms,
+            "model_ms": self.model_ms,
+            "tools_ms": tools,
+            "waiting_ms": self.wait_ms,
+            "other_ms": max(0, self.latency_ms - self.model_ms - tools - self.wait_ms),
+            "model_requests": self.steps,
+            "rate_limited": self.rate_limited,
+        }
 
 
 def _json(value: Any) -> Any:
@@ -135,6 +151,9 @@ def ask(
         reply = model.complete(messages, tools)
         run.prompt_tokens += reply.prompt_tokens
         run.completion_tokens += reply.completion_tokens
+        run.model_ms += reply.model_ms
+        run.wait_ms += reply.wait_ms
+        run.rate_limited += reply.rate_limited
         messages.append(reply.as_message())
         if not reply.tool_calls:
             messages.append(
@@ -191,6 +210,7 @@ def _row(run: Run, org_id: int) -> dict:
         "citations": [asdict(c) for c in rendered.citations] if rendered else [],
         "caveats": rendered.caveats if rendered else [],
         "errors": run.errors,
+        "timing": run.timing(),
     }
     return {
         "id": run.id,

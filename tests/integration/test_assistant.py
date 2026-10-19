@@ -156,3 +156,20 @@ def test_a_run_says_where_its_time_went(engines):
     assert timing["model_ms"] == 2000 and timing["waiting_ms"] == 4000
     assert timing["model_requests"] == 2 and timing["rate_limited"] == 1
     assert timing["tools_ms"] >= 0 and timing["total_ms"] >= 0
+
+
+def test_an_instruction_planted_in_the_data_never_reaches_the_model(engines):
+    _, app = engines
+    model = ScriptedModel(
+        [
+            Reply(None, [call("list_annotations", {"annotation_type": "promotion"})]),
+            Reply(None, [call("submit_answer", {"status": "answered", "answer": "Noted."})]),
+        ]
+    )
+
+    run = ask("What promotions ran?", engine=app, org=ORG, model=model, store=False)
+
+    sent = model.seen[1][-1]["content"]  # the tool result as the model received it
+    assert "ignore your previous instructions" not in sent
+    assert "withheld" in sent and "Fall furnace" in sent
+    assert "instruction_in_data" in [c["code"] for c in run.rendered.caveats]

@@ -746,6 +746,8 @@ WARNING_MESSAGES = {
     "the mapping sheet.",
     "capture_drop": "Tracking capture on web forms fell sharply in at least one week; fewer "
     "attributed leads that week reflect broken tracking, not fewer customers.",
+    "instruction_in_data": "Some text in the data looked like instructions to the assistant "
+    "and was withheld; check the source record.",
     "sources_not_additive": "Meta, GA4 and Salesforce each count leads their own way; compare "
     "them side by side, never add them.",
 }

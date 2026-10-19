@@ -24,6 +24,7 @@ from marketingiq.analytics.reports import (
     get_lead_funnel,
     get_source_reconciliation,
 )
+from marketingiq.screening import screen
 
 
 @dataclass(frozen=True)
@@ -114,7 +115,8 @@ TOOLS: dict[str, Tool] = {
 
 
 def call_tool(engine: Engine, org_slug: str, name: str, arguments: dict[str, Any]) -> dict:
-    """Validate the arguments with the tool's input model, then run it. Raises KeyError for
-    an unknown tool and pydantic.ValidationError for bad arguments."""
+    """Validate the arguments with the tool's input model, run it, and screen text from the
+    data before a model reads it (screening.py). Raises KeyError for an unknown tool and
+    pydantic.ValidationError for bad arguments."""
     tool = TOOLS[name]
-    return tool.run(engine, org_slug, tool.input_model.model_validate(arguments))
+    return screen(tool.run(engine, org_slug, tool.input_model.model_validate(arguments)))

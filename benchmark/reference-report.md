@@ -325,7 +325,7 @@ Reference calls: `get_data_quality`.
 | Fact | Value |
 | --- | --- |
 | `0:days_without_data` | `{"meta_insights": [], "ga4_sessions": [], "salesforce_leads": []}` |
-| `0:latest_loads` | `{"annotations": {"loaded": 5, "rejected": 0, "duplicates": 0}, "campaign_mapping_sheet": {"loaded": 12, "rejected": 0, "duplicates": 0}, "ga4_sessions": {"lo...` |
+| `0:latest_loads` | `{"annotations": {"loaded": 7, "rejected": 0, "duplicates": 0}, "campaign_mapping_sheet": {"loaded": 12, "rejected": 0, "duplicates": 0}, "ga4_sessions": {"lo...` |
 | `0:failed_loads` | `0` |
 
 ### R01: What is our real average sales cycle?

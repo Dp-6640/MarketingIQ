@@ -11,6 +11,9 @@ from marketingiq.assistant.paths import walk
 from marketingiq.tools import TOOLS
 
 CASES = Path(__file__).with_name("cases.toml")
+# Held-out questions, never used for tuning (docs/benchmark.md).
+HELDOUT = Path(__file__).with_name("heldout.toml")
+CASE_SETS = {"main": CASES, "heldout": HELDOUT}
 
 
 class Call(BaseModel):

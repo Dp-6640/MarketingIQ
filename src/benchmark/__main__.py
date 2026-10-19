@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import text
 
 from benchmark.agents import reference_agent
-from benchmark.cases import Case, load_cases, resolve
+from benchmark.cases import CASE_SETS, Case, load_cases, resolve
 from benchmark.score import citable, expected_facts, score
 from benchmark.verify import check_result
 from marketingiq.assistant.llm import ModelNotConfigured, get_chat_model
@@ -147,7 +147,7 @@ def report(outcomes: list[dict], dataset: Path) -> str:
 
 
 def run_benchmark(args, engine) -> None:
-    cases = load_cases()
+    cases = load_cases(CASE_SETS[args.set])
     if args.cases:
         wanted = set(args.cases.split(","))
         cases = [c for c in cases if c.id in wanted]
@@ -182,6 +182,7 @@ def run_benchmark(args, engine) -> None:
             f" cited {result.cited}/{result.citable} {run.latency_ms:6} ms"
         )
     path = args.out or Path("benchmark/runs") / (
+        f"{'' if args.set == 'main' else args.set + '-'}"
         f"{model_name.replace('/', '_')}-{datetime.now():%Y%m%d-%H%M}.md"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -242,9 +243,10 @@ def main() -> None:
     parser.add_argument("command", choices=["check", "run"])
     parser.add_argument("--dataset", type=Path, default=DATASET)
     parser.add_argument("--org", default="synthetic-home-services")
-    parser.add_argument("--report", type=Path, default=REPORT)
+    parser.add_argument("--report", type=Path, help="answer-key report path for `check`")
     parser.add_argument("--agent", choices=["model", "reference"], default="model")
     parser.add_argument("--cases", help="comma-separated case ids, e.g. Q01,R06")
+    parser.add_argument("--set", choices=sorted(CASE_SETS), default="main", help="case set")
     parser.add_argument("--delay", type=float, default=0.0, help="seconds between cases")
     parser.add_argument("--out", type=Path, help="report path for `run`")
     args = parser.parse_args()
@@ -261,16 +263,20 @@ def main() -> None:
         run_benchmark(args, engine)
         return
 
-    outcomes = [run_case(case, engine, args.org, facts) for case in load_cases()]
+    cases = load_cases(CASE_SETS[args.set])
+    outcomes = [run_case(case, engine, args.org, facts) for case in cases]
     for o in outcomes:
         status = "pass" if not o["problems"] else "FAIL"
         print(f"{o['case'].id:5} {status:4} {o['checked']:5} numbers  {o['case'].question[:70]}")
         for problem in o["problems"]:
             print(f"        {problem}")
-    args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(report(outcomes, args.dataset), encoding="utf-8", newline="\n")
+    path = args.report or (
+        REPORT if args.set == "main" else REPORT.with_name(f"{args.set}-reference-report.md")
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(report(outcomes, args.dataset), encoding="utf-8", newline="\n")
     failed = sum(bool(o["problems"]) for o in outcomes)
-    print(f"\n{len(outcomes) - failed}/{len(outcomes)} cases pass; report: {args.report}")
+    print(f"\n{len(outcomes) - failed}/{len(outcomes)} cases pass; report: {path}")
     sys.exit(1 if failed else 0)
 
 

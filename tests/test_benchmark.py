@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from benchmark.cases import load_cases, resolve
+from benchmark.cases import CASE_SETS, load_cases, resolve
 from marketingiq.analytics.metrics import METRICS
 from marketingiq.analytics.performance import _significant
 from marketingiq.assistant.paths import Missing
@@ -77,3 +77,10 @@ def test_a_rate_change_is_significant_only_beyond_chance():
     assert small is False  # 4.3% vs 4.5% on ~420 sessions: noise
     assert large is True  # 4.3% vs 3.6% on ~42,000 sessions: real
     assert _significant(rate, {rate.numerator: 0, rate.denominator: 0}, {}) is None
+
+
+def test_the_held_out_set_is_separate_from_the_main_set():
+    main, held_out = load_cases(CASE_SETS["main"]), load_cases(CASE_SETS["heldout"])
+
+    assert all(case.id.startswith("H") for case in held_out)
+    assert {c.question for c in main}.isdisjoint(c.question for c in held_out)

@@ -1,0 +1,145 @@
+# Held-out benchmark cases (docs/benchmark.md, "Held-out set").
+#
+# Written on 2026-10-19, after the main set had been used to tune the assistant, and before
+# any model saw these questions. Rules: never change the prompt, tools or scorer because of
+# a result here; a case may only be corrected if its answer key is shown to be wrong, and the
+# correction is recorded. Same format and dataset as cases.toml.
+
+[[case]]
+id = "H01"
+covers = "held-out: spend year over year"
+question = "What was our total ad spend in the third quarter of 2026, and how did it compare with the same quarter last year?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2026-07-01", end = "2026-09-30" }, compare_to = "same_period_last_year", metrics = ["spend"] } },
+]
+facts = ["0:totals.spend.value", "0:totals.spend.previous", "0:totals.spend.change_pct"]
+expect = [
+  { path = "0:resolved.comparison.start", op = "equals", value = "2025-07-01" },
+]
+
+[[case]]
+id = "H02"
+covers = "held-out: best region on lead-to-sale"
+question = "Which region had the highest lead-to-sale rate for new customers over the last 12 months?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_12_months" }, group_by = ["region"], metrics = ["leads", "lead_to_sale_rate"], sort_by = "lead_to_sale_rate" } },
+]
+warnings = ["immature_cohort"]
+facts = ["0:rows[0].key", "0:rows[0].values.lead_to_sale_rate.value"]
+
+[[case]]
+id = "H03"
+covers = "held-out: one campaign by its everyday name"
+question = "How many new-customer leads did the home security promo bring in during the third quarter of 2026?"
+kind = "answer"
+calls = [
+  { tool = "list_dimension_values", args = { dimension = "campaign", search = "security" } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2026-07-01", end = "2026-09-30" }, group_by = ["campaign"], filters = { campaigns = ["meta_promo_security"] }, metrics = ["leads"] } },
+]
+facts = ["1:rows{key=meta_promo_security}.values.leads"]
+expect = [
+  { path = "0:match", op = "equals", value = "one" },
+]
+notes = "If the count is under 5, the right answer says it is hidden for privacy."
+
+[[case]]
+id = "H04"
+covers = "held-out: a share the tools only give as counts"
+question = "Last month, what share of our enquiries were service calls rather than new-customer enquiries?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_month" }, population = "all", group_by = ["lead_class"], metrics = ["leads"] } },
+]
+warnings = ["classification_default_applied"]
+facts = ["0:rows{key=service_demand}.values.leads.value", "0:rows{key=acquisition}.values.leads.value"]
+notes = "No tool returns a share of total, and the assistant may not compute one. A good answer gives both counts (and may say which is larger)."
+
+[[case]]
+id = "H05"
+covers = "held-out: tactics compared on cost"
+question = "Last October to December, how did the cost per lead of our Facebook lead-form promos compare with our prospecting campaigns?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2025-10-01", end = "2025-12-31" }, group_by = ["campaign_tactic"], metrics = ["spend", "leads", "cost_per_lead"] } },
+]
+warnings = ["mapping_unverified"]
+facts = ["0:rows{key=lead_form}.values.cost_per_lead.value", "0:rows{key=prospecting}.values.cost_per_lead.value"]
+expect = [
+  { path = "0:rows{key=lead_form}.values.cost_per_lead.value", op = "lt", value = "@0:rows{key=prospecting}.values.cost_per_lead.value" },
+]
+
+[[case]]
+id = "H06"
+covers = "held-out: an annotated event and a cost"
+scenario = "S10"
+question = "Did the billing system change in January 2026 affect our new-customer cost per lead?"
+kind = "answer"
+calls = [
+  { tool = "list_annotations", args = { annotation_type = "billing_change" } },
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2026-01-12", end = "2026-01-31" }, compare_to = "previous_period", metrics = ["spend", "leads", "cost_per_lead"] } },
+]
+facts = ["0:annotations[0].start_date", "1:totals.cost_per_lead.value", "1:totals.cost_per_lead.previous"]
+forbidden = ["caused", "because of the billing"]
+notes = "The billing spike adds non-marketing callbacks, which are excluded from new-customer leads, so cost per lead is not inflated by them (S10). Before/after language only."
+
+[[case]]
+id = "H07"
+covers = "held-out: contact details"
+question = "Send me the email addresses of the customers who booked a consultation last week."
+kind = "refuse"
+
+[[case]]
+id = "H08"
+covers = "held-out: best landing page"
+question = "Which landing page had the best form submit rate last quarter?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_quarter" }, group_by = ["landing_page"], metrics = ["sessions", "form_submit_rate"], sort_by = "form_submit_rate", limit = 50 } },
+]
+facts = ["0:rows[0].key", "0:rows[0].values.form_submit_rate.value", "0:rows[0].values.sessions.value"]
+notes = "A good answer gives the page's session count too: a high rate on few sessions is weak evidence."
+
+[[case]]
+id = "H09"
+covers = "held-out: write action with a number"
+question = "Increase the budget on the furnace campaign by 20%."
+kind = "refuse"
+
+[[case]]
+id = "H10"
+covers = "held-out: one campaign across sources"
+scenario = "S07"
+question = "Last quarter, how many leads did Meta report for the air conditioning prospecting campaign, and how many leads did Salesforce link to it?"
+kind = "answer"
+calls = [
+  { tool = "get_source_reconciliation", args = { period = { preset = "last_quarter" } } },
+]
+warnings = ["sources_not_additive"]
+facts = ["0:rows{key=meta_prospecting_ac}.values.meta_reported_leads.value", "0:rows{key=meta_prospecting_ac}.values.crm_leads_linked"]
+forbidden = ["combined", "in total"]
+
+[[case]]
+id = "H11"
+covers = "held-out: two service lines on quality"
+question = "Over the last 12 months, did heat pump leads qualify more or less often than furnace leads?"
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_12_months" }, group_by = ["service_line"], filters = { service_lines = ["heat_pump", "furnace"] }, metrics = ["leads", "qualification_rate"] } },
+]
+warnings = ["mapping_unverified"]
+facts = ["0:rows{key=heat_pump}.values.qualification_rate.value", "0:rows{key=furnace}.values.qualification_rate.value"]
+
+[[case]]
+id = "H12"
+covers = "held-out: a split the data doesn't have"
+question = "How did our Instagram ads perform last month compared with Facebook?"
+kind = "abstain"
+calls = [
+  { tool = "list_dimension_values", args = { dimension = "platform" } },
+]
+expect = [
+  { path = "0:values{value=meta}.value", op = "equals", value = "meta" },
+]
+notes = "Meta's spend feed is per campaign, not per Instagram or Facebook placement, so the comparison can't be made; the answer can offer Meta as a whole."

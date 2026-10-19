@@ -28,3 +28,9 @@ def reference_agent(case: Case, citable_paths: list[str]) -> ScriptedModel:
         Reply(None, [call("submit_answer", {"status": _STATUS[case.kind], "answer": answer})])
     )
     return ScriptedModel(replies, name="reference-agent")
+
+
+def clarifying_agent() -> ScriptedModel:
+    """An earlier turn of a conversation case: the reference agent asks which one is meant."""
+    reply = call("submit_answer", {"status": "clarify", "answer": "Which one do you mean?"})
+    return ScriptedModel([Reply(None, [reply])], name="reference-agent")

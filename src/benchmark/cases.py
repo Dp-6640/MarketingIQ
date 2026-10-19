@@ -52,6 +52,9 @@ class Case(BaseModel):
     expect: list[Expect] = Field(default_factory=list)
     forbidden: list[str] = Field(default_factory=list)
     notes: str = ""
+    # A conversation: the user's later replies, in order. Everything else in the case
+    # (kind, calls, facts...) describes the last answer, which is the one scored.
+    followups: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _consistent(self) -> "Case":

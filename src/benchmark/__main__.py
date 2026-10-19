@@ -20,7 +20,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from benchmark.agents import reference_agent
+from benchmark.agents import clarifying_agent, reference_agent
 from benchmark.cases import CASE_SETS, Case, load_cases, resolve
 from benchmark.score import citable, expected_facts, score
 from benchmark.verify import check_result
@@ -164,16 +164,32 @@ def run_benchmark(args, engine) -> None:
             time.sleep(args.delay)  # stay under free-tier requests per minute
         reference = [call_tool(engine, args.org, c.tool, c.args) for c in case.calls]
         key = expected_facts(case, reference)
-        if args.agent == "model":
-            model = get_chat_model()
-        else:
-            model = reference_agent(case, [p for p, v in key.items() if citable(v)])
-        try:
-            run = ask(
-                case.question, engine=engine, org=args.org, model=model, store=args.agent == "model"
-            )
-        except Exception as exc:
-            run = Run(id=uuid.uuid4(), question=case.question, model=model.name, errors=[str(exc)])
+        turns = [case.question, *case.followups]
+        history: list[tuple[str, str]] = []
+        follows = None
+        for turn, question in enumerate(turns):
+            last = turn == len(turns) - 1
+            if args.agent == "model":
+                model = get_chat_model()
+            elif last:
+                model = reference_agent(case, [p for p, v in key.items() if citable(v)])
+            else:
+                model = clarifying_agent()
+            try:
+                run = ask(
+                    question,
+                    engine=engine,
+                    org=args.org,
+                    model=model,
+                    store=args.agent == "model",
+                    history=history,
+                    follows=follows,
+                )
+            except Exception as exc:
+                run = Run(id=uuid.uuid4(), question=question, model=model.name, errors=[str(exc)])
+                break
+            history.append((question, run.answer or ""))
+            follows = run.id
         result = score(case, run, key)
         scores.append((case, run, result))
         mark = "pass" if result.passed else "FAIL"
@@ -227,7 +243,9 @@ def run_report(scores: list, model_name: str) -> str:
         lines += [
             f"### {case.id}: {case.question}",
             "",
-            f"Expected: {case.kind}. Got: {run.status}.",
+            *[f'Then the user replied: "{reply}"' for reply in case.followups],
+            f"Expected: {case.kind}. Got: {run.status}"
+            + (" (last turn scored)." if case.followups else "."),
         ]
         lines += ["", f"> {(run.answer or '(no answer)').replace(chr(10), ' ')}", ""]
         tools = ", ".join(f"`{c.tool}`" + ("" if c.ok else " (failed)") for c in run.calls)

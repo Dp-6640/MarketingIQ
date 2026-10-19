@@ -143,3 +143,31 @@ expect = [
   { path = "0:values{value=meta}.value", op = "equals", value = "meta" },
 ]
 notes = "Meta's spend feed is per campaign, not per Instagram or Facebook placement, so the comparison can't be made; the answer can offer Meta as a whole."
+
+# --- conversations (added 2026-10-19, before any model run of them) ------------------------
+
+[[case]]
+id = "H13"
+covers = "held-out: a clarification, then the reply"
+question = "How is the furnace campaign doing?"
+followups = ["The lead form promo, over the last 12 months."]
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "last_12_months" }, group_by = ["campaign"], filters = { campaigns = ["meta_lead_form_furnace_promo"] }, metrics = ["spend", "leads", "qualified_leads", "cost_per_lead"] } },
+]
+warnings = ["mapping_unverified"]
+facts = ["0:rows{key=meta_lead_form_furnace_promo}.values.leads.value", "0:rows{key=meta_lead_form_furnace_promo}.values.cost_per_lead.value"]
+notes = "The first answer should ask which furnace campaign; the reply picks one and a period."
+
+[[case]]
+id = "H14"
+covers = "held-out: a follow-up that changes the period"
+question = "Which campaign had the lowest cost per lead last quarter?"
+followups = ["And in the same quarter last year?"]
+kind = "answer"
+calls = [
+  { tool = "get_performance", args = { period = { preset = "custom", start = "2025-07-01", end = "2025-09-30" }, group_by = ["campaign"], metrics = ["leads", "cost_per_lead"], sort_by = "cost_per_lead", sort_desc = false } },
+]
+warnings = ["mapping_unverified"]
+facts = ["0:rows[0].key", "0:rows[0].values.cost_per_lead.value"]
+notes = "The follow-up only makes sense with the first question as context: same measure, same grouping, a year earlier."

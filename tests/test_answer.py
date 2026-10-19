@@ -129,3 +129,27 @@ def test_a_copied_wrapper_prefix_is_ignored():
     )
 
     assert rendered.errors == [] and rendered.text == "$12,345.60"
+
+
+def test_an_overloaded_provider_ends_with_a_clear_message(monkeypatch):
+    import httpx2
+    from openai import InternalServerError
+
+    from marketingiq.assistant import llm
+
+    model = llm.OpenAICompatible("http://example.invalid/v1", "key", "busy-model", max_waits=1)
+    request = httpx2.Request("POST", "http://example.invalid/v1/chat/completions")
+    busy = InternalServerError(
+        "This model is currently experiencing high demand.",
+        response=httpx2.Response(503, request=request),
+        body=None,
+    )
+
+    def overloaded(**_):
+        raise busy
+
+    monkeypatch.setattr(model._client.chat.completions, "create", overloaded)
+    monkeypatch.setattr(llm.time, "sleep", lambda _: None)
+
+    with pytest.raises(llm.ProviderUnavailable, match="busy-model is overloaded"):
+        model.complete([{"role": "user", "content": "hi"}], [])

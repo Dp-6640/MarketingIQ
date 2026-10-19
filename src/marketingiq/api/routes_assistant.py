@@ -12,7 +12,7 @@ from marketingiq.assistant.answer import REFERENCE
 from marketingiq.assistant.llm import (
     ChatModel,
     ModelNotConfigured,
-    ProviderQuotaExhausted,
+    ProviderUnavailable,
     get_chat_model,
 )
 from marketingiq.assistant.run import Run, ask
@@ -194,5 +194,5 @@ def ask_question(
             follows=body.follows,
         )
         return present(run)
-    except ProviderQuotaExhausted as exc:
+    except ProviderUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None

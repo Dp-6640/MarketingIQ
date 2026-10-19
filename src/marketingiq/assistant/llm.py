@@ -110,10 +110,16 @@ class OpenAICompatible:
                     raise ProviderQuotaExhausted(_quota_message(detail)) from None
                 time.sleep(_retry_delay(detail))
                 waited += time.monotonic() - started
-            except (APIConnectionError, InternalServerError):
+            except (APIConnectionError, InternalServerError) as exc:
                 # A dropped connection or a 5xx: brief backoff, then the same limit of tries.
                 if attempt == self._max_waits:
-                    raise
+                    busy = "high demand" in str(exc).lower() or "UNAVAILABLE" in str(exc)
+                    raise ProviderUnavailable(
+                        f"The model {self._model} is overloaded at the provider; try again"
+                        " later or set LLM_MODEL to another model."
+                        if busy
+                        else "The model provider can't be reached; check the connection."
+                    ) from None
                 time.sleep(2 ** min(attempt, 4))
                 waited += time.monotonic() - started
         message = response.choices[0].message
@@ -167,7 +173,11 @@ class ModelNotConfigured(RuntimeError):
     pass
 
 
-class ProviderQuotaExhausted(RuntimeError):
+class ProviderUnavailable(RuntimeError):
+    """The model provider can't answer right now; the message says why, for the user."""
+
+
+class ProviderQuotaExhausted(ProviderUnavailable):
     """The provider's quota is used up (per day, or still per minute after waiting)."""
 
 

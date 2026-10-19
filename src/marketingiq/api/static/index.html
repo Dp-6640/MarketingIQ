@@ -9,12 +9,14 @@
     --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dfe3e8;
     --accent: #1f5fbf; --accent-soft: #e6eefb; --warn: #8a5a00; --warn-soft: #fff4dc;
     --bad: #a3262c; --bad-soft: #fde8e9; --good: #1d6b3a; --good-soft: #e3f4e8;
+    --on-accent: #ffffff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #111418; --panel: #1a1e24; --ink: #e8ebef; --muted: #9aa3ae; --line: #2c323a;
       --accent: #7fb0ff; --accent-soft: #1d2b44; --warn: #f2c46b; --warn-soft: #3a2f17;
       --bad: #ff8f95; --bad-soft: #3f1d20; --good: #7fd69c; --good-soft: #17301f;
+      --on-accent: #0b1525;
     }
   }
   * { box-sizing: border-box; }
@@ -33,7 +35,7 @@
              color: var(--ink); font: inherit; }
   .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
   button { font: inherit; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
-  .ask { background: var(--accent); color: #fff; border-color: var(--accent);
+  .ask { background: var(--accent); color: var(--on-accent); border-color: var(--accent);
          padding: 8px 18px; font-weight: 600; }
   .ask:disabled { opacity: .6; cursor: progress; }
   .example { background: transparent; color: var(--accent); padding: 4px 10px; font-size: 13px; }

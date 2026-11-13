@@ -12,13 +12,18 @@ Or `POST /api/v1/assistant/ask` with `{"question": "..."}`.
 
 `uv run uvicorn marketingiq.api.app:app`, then open `http://127.0.0.1:8000/`.
 
-It has a question box with example questions and a banner saying the data is synthetic. Each answer comes with:
-- every filled-in number highlighted; hover to see the call and path it came from;
-- an evidence table: each value, the tool call that produced it, and its path in the result;
-- the caveats;
-- the full tool-call trace.
+A full-screen dashboard:
 
-The page is plain HTML and JavaScript ([`static/index.html`](../src/marketingiq/api/static/index.html)) with no build step. Model text is inserted as text, never as HTML.
+- **Headline tiles** for the last complete month (leads, qualified leads, qualification rate, spend, cost per lead, attribution coverage), each with its change from the month before and a 12-month sparkline. They come from `GET /api/v1/dashboard`, which calls the performance service directly. No model is involved, so the tiles work even when the model's quota is used up. "Show as table" gives every value.
+- **Recent questions** (left): searchable, and each one reopens its whole conversation.
+- **The conversation** (centre): the question, the answer with every number highlighted, the caveats, and replies that continue the conversation. When the assistant asks a clarifying question, the box is ready for the reply.
+- **The inspector** (right): **Evidence** (click a highlighted number to jump to the tool call and path it came from), **Tool calls** (each call's arguments and result status) and **Timing** (model, tools and waiting on the provider).
+- **A link to any answer**: the address ends in `#run=<id>`, so an answer can be bookmarked or opened directly.
+- Light and dark themes, keyboard shortcuts (`/` focuses the question, Enter asks, Shift+Enter adds a line), side panels that become drawers on narrower screens, and respect for the system's reduce-motion and reduce-transparency settings.
+
+The look mixes three materials: a slowly moving colour background, frosted-glass panels with a light-catching "liquid glass" rim, and soft neumorphic tiles and controls. The chart colours were validated for colour-blind readers and contrast in both themes.
+
+The page is plain HTML and JavaScript ([`static/index.html`](../src/marketingiq/api/static/index.html)) with no build step. Model and data text is always inserted as text, never as HTML.
 
 ## Setup: a free model
 

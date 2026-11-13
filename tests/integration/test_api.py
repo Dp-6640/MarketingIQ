@@ -223,3 +223,28 @@ def test_following_an_unknown_run_is_404(client):
         assert client.post("/api/v1/assistant/ask", json=body).status_code == 404
     finally:
         del app.dependency_overrides[chat_model]
+
+
+def test_the_dashboard_gives_a_year_of_headline_figures(client):
+    body = client.get("/api/v1/dashboard").json()
+
+    assert body["synthetic"] is True and body["data_as_of"] == "2026-03-31"
+    assert len(body["months"]) == 12 and body["months"][-1] == "2026-03"
+    assert [t["metric"] for t in body["tiles"]] == [
+        "leads",
+        "qualified_leads",
+        "qualification_rate",
+        "spend",
+        "cost_per_lead",
+        "attribution_coverage",
+    ]
+    assert all(len(t["series"]) == 12 for t in body["tiles"])
+    leads = client.post(
+        "/api/v1/analytics/performance",
+        json={
+            "period": {"preset": "last_month"},
+            "metrics": ["leads"],
+            "population": "acquisition",
+        },
+    ).json()["totals"]["leads"]["value"]
+    assert body["tiles"][0]["series"][-1]["value"] == leads  # the same service, the same number

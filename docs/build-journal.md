@@ -53,6 +53,8 @@ Newest first; generated from `git log`.
 
 | Date | Commit | Step |
 | --- | --- | --- |
+| 2026-11-13 | `8f212a1` | Full-screen dashboard |
+| 2026-10-19 | `ebb6471` | Journal: step 16 |
 | 2026-10-19 | `c58be6b` | Demo guide: a reply that shows the promo story |
 | 2026-10-19 | `0134eae` | README for the project as it is now, and a demo guide |
 | 2026-10-19 | `907ab08` | Screen data labels for instructions before the model reads them |
@@ -512,6 +514,25 @@ After the fixes, the two implementations agree everywhere: 26 tests on the tiny 
 
 **Interview line:** "I planted a prompt injection in the synthetic data and tested it held-out. The model didn't obey it, but it repeated it to the user. So text from the data is now screened before the model reads it, on top of the structural defenses: read-only tools and numbers that only come from tool results."
 
+## Step 17: a full-screen dashboard
+
+**What we built** (`8f212a1`): the demo page became a dashboard that uses the whole screen.
+
+- **Headline tiles** for the last complete month, each with its change and a 12-month sparkline, from a new endpoint (`GET /api/v1/dashboard`) that calls the performance service directly.
+- **Three columns:** recent questions, the conversation, and an inspector with evidence, tool calls and timing.
+- **The look** mixes glassmorphism (frosted panels over a moving colour background), "liquid glass" (a bright rim and sheen where light would catch a curved edge) and neumorphism (soft raised and pressed tiles and controls), in light and dark.
+
+**Why:**
+
+- **The tiles need no model.** They are computed by the same analytics code the assistant uses, so the dashboard still works when the free model's quota runs out, which happened the day this was built.
+- **Charts follow rules, not taste.** Sparklines use a muted history and the current month in the accent. Change colours depend on whether "up" is good, and always come with an arrow and words. The palette was run through a colour-blindness and contrast validator for both themes, and every value is also available as a table.
+- **The new tiles surfaced a story:** cost per lead roughly tripled after July. Spend didn't change. A cheap lead-form promo ended, so the blend shifted. That makes a good demo question ("why did cost per lead jump?") about mix, not performance.
+- **Glass must not cost readability.** Panels stay opaque enough for text contrast, and the system's reduce-transparency and reduce-motion settings switch the effects off.
+
+**Concepts:** glassmorphism, neumorphism, stat tiles and sparklines, colour-vision-deficiency validation, mix shift, progressive disclosure (inspector tabs), responsive drawers.
+
+**Interview line:** "The dashboard's headline numbers come from the same deterministic tools as the assistant, so they work with no model at all. Putting them on screen exposed a cost-per-lead jump that turned out to be a mix shift, a cheap promo ending, which is exactly the kind of question the assistant should then explain."
+
 ## Concepts glossary
 
 The terms that come up most, grouped by field. I'll add to this as new ones appear.
@@ -586,6 +607,8 @@ The terms that come up most, grouped by field. I'll add to this as new ones appe
 | False negative | A check that fails something that was actually right | Held-out case H14 |
 | Indirect prompt injection | Instructions hidden in data the model reads (a label, a web page), rather than typed by the user | Scenario S15, held-out H15 |
 | Defense in depth | Several independent protections, so one failing isn't a breach | Screening, read-only tools, numbers by reference |
+| Mix shift | A blended figure changing because the mix of its parts changed, not because any part got better or worse | Cost per lead after July 2026 |
+| Glassmorphism / neumorphism | Frosted translucent panels / soft raised surfaces the same colour as their background | The dashboard |
 
 ## Interview talking points
 
